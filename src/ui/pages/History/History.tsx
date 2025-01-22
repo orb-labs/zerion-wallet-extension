@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { AddressAction } from 'defi-sdk';
 import { Client, useAddressActions } from 'defi-sdk';
-import { hashQueryKey, useQuery } from '@tanstack/react-query';
+import { hashKey, useQuery } from '@tanstack/react-query';
 import { useAddressParams } from 'src/ui/shared/user-address/useAddressParams';
 import { useLocalAddressTransactions } from 'src/ui/transactions/useLocalAddressTransactions';
 import type { Chain } from 'src/modules/networks/Chain';
@@ -82,7 +82,7 @@ function useMinedAndPendingAddressActions({
     queryKey: ['pages/history', localActions, chain, searchQuery, client],
     queryKeyHashFn: (queryKey) => {
       const key = queryKey.map((x) => (x instanceof Client ? x.url : x));
-      return hashQueryKey(key);
+      return hashKey(key);
     },
     queryFn: async () => {
       let items = await Promise.all(
@@ -105,7 +105,7 @@ function useMinedAndPendingAddressActions({
       }
       return items;
     },
-    useErrorBoundary: true,
+    throwOnError: true,
   });
 
   const {
@@ -141,7 +141,7 @@ function useMinedAndPendingAddressActions({
           )
         : null,
       ...localActionsQuery,
-      isLoading: actionsIsLoading || localActionsQuery.isLoading,
+      isLoading: actionsIsLoading || localActionsQuery.isPending,
       hasMore,
       fetchMore,
     };

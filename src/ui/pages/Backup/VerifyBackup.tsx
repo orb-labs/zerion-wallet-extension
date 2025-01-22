@@ -54,7 +54,7 @@ export function VerifyBackup({
 
   const {
     data: recoveryPhraseMasked,
-    isLoading,
+    isPending,
     isError,
     error,
   } = isPendingWallet
@@ -157,7 +157,7 @@ export function VerifyBackup({
               <Button
                 kind="primary"
                 style={{ width: '100%' }}
-                disabled={isLoading}
+                disabled={isPending}
               >
                 Verify
               </Button>

@@ -61,8 +61,7 @@ export function ConnectedSiteDialog({
   const { data: connectedSites, refetch } = useQuery({
     queryKey: ['getPermissionsWithWallets'],
     queryFn: getPermissionsWithWallets,
-    useErrorBoundary: true,
-    suspense: false,
+    throwOnError: true,
   });
   const connectedSite = useMemo(
     () => getConnectedSite(originName, connectedSites),

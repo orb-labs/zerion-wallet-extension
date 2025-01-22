@@ -35,7 +35,7 @@ export function AllowanceView({
   );
 
   const assetIds = asset ? [asset?.asset_code] : [];
-  const { data, isLoading: positionsAreLoading } = useHttpAddressPositions(
+  const { data, isPending: positionsAreLoading } = useHttpAddressPositions(
     { addresses: [address], currency, assetIds },
     { source: useHttpClientSource() },
     {

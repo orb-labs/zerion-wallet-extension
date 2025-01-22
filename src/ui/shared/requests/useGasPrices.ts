@@ -25,7 +25,7 @@ export async function queryGasPrices(chain: Chain) {
   });
 }
 
-export function useGasPrices(chain: Chain | null, { suspense = false } = {}) {
+export function useGasPrices(chain: Chain | null) {
   const { preferences } = usePreferences();
   const source = preferences?.testnetMode?.on ? 'testnet' : 'mainnet';
   return useQuery({
@@ -38,9 +38,8 @@ export function useGasPrices(chain: Chain | null, { suspense = false } = {}) {
       const networks = await networksStore.load({ chains: [chain.toString()] });
       return fetchGasPrice({ chain, networks, source, apiClient: ZerionAPI });
     },
-    useErrorBoundary: true,
+    throwOnError: true,
     enabled: Boolean(chain),
-    suspense,
     staleTime: 10000,
   });
 }

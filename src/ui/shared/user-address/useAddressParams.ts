@@ -33,7 +33,6 @@ export function useAddressParams(): Result {
   } = useQuery({
     queryKey: QUERY_KEY,
     queryFn,
-    useErrorBoundary: true,
   });
   const address = addressResult || '';
   const addressNormalized = normalizeAddress(address);

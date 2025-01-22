@@ -37,13 +37,13 @@ function BackupReminderComponent({ onDismiss }: { onDismiss: () => void }) {
     dialogRef.current?.close();
   });
 
-  const { data: walletGroups, isLoading } = useWalletGroups();
+  const { data: walletGroups, isPending } = useWalletGroups();
   const notBackedUpGroups = useMemo(
     () => walletGroups?.filter((group) => needsBackup(group)),
     [walletGroups]
   );
 
-  if (isLoading || !notBackedUpGroups || !notBackedUpGroups.length) {
+  if (isPending || !notBackedUpGroups || !notBackedUpGroups.length) {
     return null;
   }
 

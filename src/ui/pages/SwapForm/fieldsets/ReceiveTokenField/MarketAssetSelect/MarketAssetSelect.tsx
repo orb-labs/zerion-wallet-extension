@@ -85,15 +85,12 @@ export function MarketAssetSelect({
     fetchNextPage,
     isLoading,
     isFetchingNextPage,
-  } = useAssetsInfoPaginatedQuery(
-    {
-      currency,
-      search_query: query,
-      order_by: query ? {} : { market_cap: 'desc' },
-      chain: shouldQueryByChain ? chain.toString() : null,
-    },
-    { suspense: false }
-  );
+  } = useAssetsInfoPaginatedQuery({
+    currency,
+    search_query: query,
+    order_by: query ? {} : { market_cap: 'desc' },
+    chain: shouldQueryByChain ? chain.toString() : null,
+  });
 
   const popularAssetCodes = useMemo(
     () =>

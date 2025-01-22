@@ -29,7 +29,7 @@ export function EraseDataListButton({
       }
     },
   });
-  if (eraseAllData.isLoading) {
+  if (eraseAllData.isPending) {
     return (
       <CenteredDialog
         open={true}

@@ -72,7 +72,7 @@ export function NetworkSelect({
   }
 
   const chain = value === NetworkSelectValue.All ? null : createChain(value);
-  const { networks, isLoading } = useNetworks(
+  const { networks, isPending } = useNetworks(
     chain ? [chain.toString()] : undefined
   );
   const network = useMemo(
@@ -104,9 +104,9 @@ export function NetworkSelect({
           value,
           openDialog: handleDialogOpen,
           networks,
-          networksAreLoading: isLoading,
+          networksAreLoading: isPending,
         })
-      ) : isLoading ? (
+      ) : isPending ? (
         <Spacer height={24} />
       ) : (
         <Button

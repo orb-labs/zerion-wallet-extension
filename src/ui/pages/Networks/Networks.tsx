@@ -151,7 +151,7 @@ function NetworkCreatePage() {
             prevChain: null,
           })
         }
-        isSubmitting={saveMutation.isLoading}
+        isSubmitting={saveMutation.isPending}
         onCancel={goBack}
         restrictedChainIds={restrictedChainIds}
         disabledFields={null}
@@ -318,7 +318,7 @@ function NetworkPage() {
               prevChain: network.id,
             })
           }
-          isSubmitting={saveMutation.isLoading}
+          isSubmitting={saveMutation.isPending}
           onReset={
             isSavedNetwork && !isCustomNetwork
               ? () => resetMutation.mutate(network)
@@ -486,7 +486,7 @@ export function Networks() {
   const { preferences } = usePreferences();
   const { currency } = useCurrency();
   const navigationType = useNavigationType();
-  const { data, isLoading: walletPortfolioIsLoading } = useWalletPortfolio(
+  const { data, isPending: walletPortfolioIsLoading } = useWalletPortfolio(
     { addresses: addresses || [], currency },
     { source: useHttpClientSource() },
     { enabled: Boolean(addresses?.length) }
@@ -496,7 +496,7 @@ export function Networks() {
     () => Object.keys(walletPortfolio?.chains || {}),
     [walletPortfolio]
   );
-  const { networks, isLoading } = useNetworks(chains);
+  const { networks, isPending } = useNetworks(chains);
 
   useEffect(() => {
     if (navigationType === NavigationType.Push) {
@@ -513,7 +513,7 @@ export function Networks() {
           path="/*"
           element={
             <NetworksView
-              loading={isLoading || walletPortfolioIsLoading}
+              loading={isPending || walletPortfolioIsLoading}
               networks={networks}
               chainDistribution={walletPortfolio ?? null}
               testnetMode={Boolean(preferences?.testnetMode?.on)}

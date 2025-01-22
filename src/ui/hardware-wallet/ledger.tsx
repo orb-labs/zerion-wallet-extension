@@ -93,7 +93,7 @@ function App() {
   useBackgroundKind({ kind: 'white' });
   const { mutate: invokeVerifySandbox } = useMutation({
     mutationFn: verifySandbox,
-    useErrorBoundary: true,
+    throwOnError: true,
   });
   const [params] = useSearchParams();
   useEffect(() => {
@@ -121,8 +121,7 @@ function App() {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      useErrorBoundary: true,
-      suspense: true,
+      throwOnError: true,
     },
   },
 });

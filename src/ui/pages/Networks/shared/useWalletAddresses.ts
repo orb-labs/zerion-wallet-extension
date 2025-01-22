@@ -6,7 +6,7 @@ export function useWalletAddresses() {
   const { data: walletGroups, ...query } = useQuery({
     queryKey: ['wallet/uiGetWalletGroups'],
     queryFn: () => walletPort.request('uiGetWalletGroups'),
-    useErrorBoundary: true,
+    throwOnError: true,
   });
 
   const addresses = useMemo(() => {

@@ -105,7 +105,7 @@ export function AddReadonlyAddress() {
   const formId = useId();
   const navigate = useNavigate();
 
-  const { mutate, isLoading: isSubmitting } = useMutation({
+  const { mutate, isPending: isSubmitting } = useMutation({
     mutationFn: submitReadonlyAddress,
     onSuccess: () => navigate('/overview'),
   });
@@ -121,7 +121,6 @@ export function AddReadonlyAddress() {
     staleTime: 20000,
     retry: 0,
     enabled: Boolean(query),
-    suspense: false,
   });
 
   const isDomainResolving = query && isInitialLoading && !isEthereumAddress;

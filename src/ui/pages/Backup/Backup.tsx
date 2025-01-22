@@ -89,7 +89,7 @@ export function BackupPage() {
         goToVerifyUser();
       }
     },
-    useErrorBoundary: true,
+    throwOnError: true,
   });
 
   return (

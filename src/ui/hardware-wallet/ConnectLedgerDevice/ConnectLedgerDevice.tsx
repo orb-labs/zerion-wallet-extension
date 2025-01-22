@@ -55,7 +55,7 @@ export function ConnectLedgerDevice({
 }) {
   const {
     mutate: invokeConnectDevice,
-    isLoading,
+    isPending,
     isSuccess,
     isError,
     error: maybeError,
@@ -131,9 +131,9 @@ export function ConnectLedgerDevice({
           onClick={() => invokeConnectDevice()}
           style={{ width: '100%' }}
           // disable on isSuccess to prevent flick of button before redirect
-          disabled={isLoading || isSuccess}
+          disabled={isPending || isSuccess}
         >
-          {isLoading || isSuccess ? 'Looking for device...' : 'Connect'}
+          {isPending || isSuccess ? 'Looking for device...' : 'Connect'}
         </Button>
         <Spacer height={24} />
       </div>

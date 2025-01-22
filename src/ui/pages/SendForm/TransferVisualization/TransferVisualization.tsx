@@ -32,8 +32,7 @@ export function TransferVisualization({
         address: to,
         groupId: null,
       }),
-    useErrorBoundary: true,
-    suspense: false,
+    throwOnError: true,
   });
   const wallet = existingWallet || { name: null, address: to };
   return (

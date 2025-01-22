@@ -264,7 +264,6 @@ export function AddressInput({
       }
       return resolveDomain(value || '');
     },
-    suspense: false,
   });
 
   useEffect(() => {
@@ -489,8 +488,7 @@ export function AddressInputWrapper(
   const { data: walletGroups, isLoading } = useQuery({
     queryKey: ['wallet/uiGetWalletGroups'],
     queryFn: () => walletPort.request('uiGetWalletGroups'),
-    useErrorBoundary: true,
-    suspense: false,
+    throwOnError: true,
   });
 
   const { savedNamesMap, savedWallets } = useMemo(() => {

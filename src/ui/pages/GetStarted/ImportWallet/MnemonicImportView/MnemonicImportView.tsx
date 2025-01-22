@@ -46,14 +46,14 @@ function useMnenomicPhraseForLocation({
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    useErrorBoundary: true,
+    throwOnError: true,
   });
   if (phraseFromState) {
     return { phrase: phraseFromState, isLoading: false, isError: false };
   } else {
     return {
       phrase: getRecoveryPhraseQuery.data,
-      isLoading: getRecoveryPhraseQuery.isLoading,
+      isLoading: getRecoveryPhraseQuery.isPending,
       isError: getRecoveryPhraseQuery.isError,
     };
   }
@@ -73,7 +73,7 @@ export function MnemonicImportView({
     queryFn: async () =>
       phrase ? getFirstNMnemonicWallets({ phrase, n: count }) : undefined,
     enabled: Boolean(phrase),
-    useErrorBoundary: true,
+    throwOnError: true,
   });
   const { value } = useAddressActivity(
     { addresses: wallets?.map((w) => w.address) || [] },

@@ -71,7 +71,7 @@ export function NetworkFee({
     totalValueExceedsBalance,
   } = costs || {};
 
-  const isLoading = feeEstimationQuery.isLoading || costsQuery.isLoading;
+  const isLoading = feeEstimationQuery.isPending || costsQuery.isLoading;
 
   const nativeAssetSymbol =
     networks?.getNetworkByName(chain)?.native_asset?.symbol;
@@ -143,7 +143,7 @@ export function NetworkFee({
         ) : displayValue ? (
           <HStack gap={0} alignItems="center">
             <HStack gap={12} alignItems="center">
-              {feeEstimationQuery.isPreviousData ? <CircleSpinner /> : null}
+              {feeEstimationQuery.isPlaceholderData ? <CircleSpinner /> : null}
               <UnstyledButton
                 type="button"
                 className={disabled ? undefined : helperStyles.hoverUnderline}

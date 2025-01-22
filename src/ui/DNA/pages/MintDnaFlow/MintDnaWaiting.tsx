@@ -32,7 +32,6 @@ export function MintDnaWaiting() {
       const dna = data?.data?.['nft-positions'][0];
       return dna || null;
     },
-    suspense: false,
     refetchInterval: (data) => (data ? false : 3000),
   });
 

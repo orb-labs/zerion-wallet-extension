@@ -68,7 +68,7 @@ function useDnaMintTransaction(address: string) {
   const feeValueFiat = costs?.totalValueFiat;
   const { currency } = useCurrency();
 
-  const { data, isLoading: positionsAreLoading } = useHttpAddressPositions(
+  const { data, isPending: positionsAreLoading } = useHttpAddressPositions(
     { addresses: [address], assetIds: ['eth'], currency },
     { source: useHttpClientSource() },
     {
@@ -226,7 +226,7 @@ export function MintDna() {
   const dialogRef = useRef<HTMLDialogElementInterface | null>(null);
   const navigate = useNavigate();
 
-  const { mutate: sendTransaction, isLoading: isTransactionLoading } =
+  const { mutate: sendTransaction, isPending: isTransactionLoading } =
     useMutation({
       mutationFn: async () => {
         return walletPort.request('openSendTransaction', {

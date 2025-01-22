@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
 import { useMemo } from 'react';
 import { estimateGas } from 'src/modules/ethereum/transactions/fetchAndAssignGasPrice';
@@ -17,7 +17,7 @@ export function useApproveHandler({
   spender,
   chain,
   enabled = true,
-  keepPreviousData = false,
+  shouldKeepPlaceholderData = false,
 }: {
   address: string;
   spendAmountBase: string | null;
@@ -26,7 +26,7 @@ export function useApproveHandler({
   spender: string | null;
   chain: Chain | null;
   enabled?: boolean;
-  keepPreviousData?: boolean;
+  shouldKeepPlaceholderData?: boolean;
 }) {
   const allowanceQuery = useQuery({
     queryKey: [
@@ -49,10 +49,8 @@ export function useApproveHandler({
       });
     },
     staleTime: 20000,
-    keepPreviousData,
-    suspense: false,
+    placeholderData: shouldKeepPlaceholderData ? keepPreviousData : undefined,
     enabled: Boolean(enabled && contractAddress && spender && chain),
-    useErrorBoundary: true,
   });
   const allowance = allowanceQuery.data;
   const enough = useMemo(() => {
@@ -95,8 +93,7 @@ export function useApproveHandler({
       return { ...tx, gas: gasAsHex, gasLimit: gasAsHex };
     },
     staleTime: Infinity,
-    keepPreviousData: true,
-    suspense: false,
+    placeholderData: shouldKeepPlaceholderData ? keepPreviousData : undefined,
     enabled: Boolean(allowanceQuery.isSuccess && spender && !enough),
     // enabled: false,
   });

@@ -155,10 +155,10 @@ function HardwareWalletList({ walletGroups }: { walletGroups: WalletGroup[] }) {
 }
 
 function WalletGroups() {
-  const { data: walletGroups, isLoading } = useQuery({
+  const { data: walletGroups, isPending } = useQuery({
     queryKey: ['wallet/uiGetWalletGroups'],
     queryFn: () => walletPort.request('uiGetWalletGroups'),
-    useErrorBoundary: true,
+    throwOnError: true,
   });
   const groupedBySeedType = useMemo(() => {
     if (!walletGroups) {
@@ -180,7 +180,7 @@ function WalletGroups() {
     >;
   }, [walletGroups]);
 
-  if (isLoading) {
+  if (isPending) {
     return null;
   }
 

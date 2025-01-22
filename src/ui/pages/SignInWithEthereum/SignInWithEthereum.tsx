@@ -282,7 +282,7 @@ export function SignInWithEthereum() {
                 wallet={wallet}
                 onClick={() => personalSign()}
                 buttonTitle={
-                  personalSignMutation.isLoading
+                  personalSignMutation.isPending
                     ? `Signing In${ellipsis}`
                     : !siweMessage?.isValid() && isDeviceAccount(wallet)
                     ? 'Proceed anyway'

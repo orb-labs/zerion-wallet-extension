@@ -5,7 +5,6 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       networkMode: 'offlineFirst',
-      suspense: true,
     },
     mutations: {
       networkMode: 'always',
@@ -26,11 +25,15 @@ emitter.on('uiAccountsChanged', () => {
 });
 
 emitter.on('sidepanel/activeTabUpdated', () => {
-  queryClient.refetchQueries(['activeTab/origin']);
+  queryClient.refetchQueries({
+    queryKey: ['activeTab/origin'],
+  });
 });
 
 emitter.on('ethereumEvent', () => {
-  queryClient.refetchQueries(['requestChainForOrigin']);
+  queryClient.refetchQueries({
+    queryKey: ['requestChainForOrigin'],
+  });
 });
 
 emitter.on('sessionLogout', () => {

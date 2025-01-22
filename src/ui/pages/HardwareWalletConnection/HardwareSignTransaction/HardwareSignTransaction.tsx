@@ -203,7 +203,7 @@ export const HardwareSignTransaction = React.forwardRef(
           tabIndex={-1}
           height={0}
         />
-        {signMutation.isLoading ? (
+        {signMutation.isPending ? (
           <Button
             kind="loading-border"
             disabled={true}
@@ -214,7 +214,7 @@ export const HardwareSignTransaction = React.forwardRef(
         ) : (
           <Button
             kind={buttonKind}
-            disabled={signMutation.isLoading || isSending}
+            disabled={signMutation.isPending || isSending}
             style={{
               paddingInline: 16, // fit longer button label
             }}

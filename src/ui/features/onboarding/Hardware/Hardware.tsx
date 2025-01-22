@@ -39,7 +39,7 @@ export function Hardware() {
   assertViewParam(view);
   assertPasswordStep(step);
 
-  const { mutate: createUserAndWallet, isLoading } = useMutation({
+  const { mutate: createUserAndWallet, isPending } = useMutation({
     mutationFn: async ({
       password,
       ledgerParams,
@@ -69,7 +69,7 @@ export function Hardware() {
         navigate('/onboarding/session-expired', { replace: true });
       }
     },
-    useErrorBoundary: true,
+    throwOnError: true,
   });
 
   const handleImport = useCallback(
@@ -108,7 +108,7 @@ export function Hardware() {
     <PageLayout>
       <VStack gap={isNarrowView ? 16 : 56}>
         <div className={styles.container}>
-          {isLoading ? (
+          {isPending ? (
             <div className={styles.loadingOverlay}>
               <UIText kind="headline/hero" className={styles.loadingTitle}>
                 Importing Ledger

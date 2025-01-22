@@ -38,12 +38,12 @@ function AccelerateTransactionContent({
 }) {
   const [view, setView] = useState<'speedup' | 'cancel' | 'default'>('default');
   const { networks } = useNetworks();
-  const { data: wallet, isLoading } = useQuery({
+  const { data: wallet, isPending } = useQuery({
     queryKey: ['wallet/uiGetCurrentWallet'],
     queryFn: () => walletPort.request('uiGetCurrentWallet'),
-    useErrorBoundary: true,
+    throwOnError: true,
   });
-  if (isLoading || !wallet) {
+  if (isPending || !wallet) {
     return null;
   }
   const isAccelerated =

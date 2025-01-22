@@ -66,13 +66,11 @@ function useNativeAddressPosition({
 export function useNativeBalance({
   address,
   chain,
-  suspense,
   staleTime,
 }: {
   address: string;
   chain: Chain;
   staleTime: number;
-  suspense?: boolean;
 }): {
   isLoading: boolean;
   data: { valueCommon: BigNumber | null; position: AddressPosition | null };
@@ -90,12 +88,11 @@ export function useNativeBalance({
     address,
     chain,
     enabled: isSupportedByBackend === false,
-    suspense,
     staleTime,
   });
 
   const isLoading =
-    nativeAddressPosition.isLoading || evmNativeAddressPosition.isLoading;
+    nativeAddressPosition.isLoading || evmNativeAddressPosition.isPending;
   const isSuccess =
     nativeAddressPosition.isSuccess || evmNativeAddressPosition.isSuccess;
   const position = nativeAddressPosition.data || evmNativeAddressPosition.data;

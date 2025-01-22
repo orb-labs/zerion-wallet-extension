@@ -399,7 +399,7 @@ export function Feed() {
     hasNextPage,
     isFetching,
     isFetchingNextPage,
-    isPreviousData,
+    isPlaceholderData,
   } = useWalletAbilities({
     address: singleAddress,
     params: useMemo(
@@ -490,7 +490,7 @@ export function Feed() {
       <Spacer height={16} />
       <SurfaceList
         style={
-          isPreviousData &&
+          isPlaceholderData &&
           (statusFilter === 'open' || statusFilter === 'expired')
             ? { opacity: 0.6 }
             : undefined

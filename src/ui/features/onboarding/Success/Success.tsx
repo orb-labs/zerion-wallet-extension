@@ -106,7 +106,6 @@ export function Success() {
       const result = await readSavedReferrerData();
       return result || null;
     },
-    suspense: true,
   });
 
   const [pendingReferrer, setPendingReferrer] = useState<ReferrerData | null>(
@@ -130,21 +129,22 @@ export function Success() {
 
   const referralCodeWidgetVisible = !referrer;
 
-  const loyaltyProgramWidget = FEATURE_LOYALTY_FLOW  === 'on' ? (
-    referralCodeWidgetVisible ? (
-      <ReferralCodeWidget
-        onSuccess={(pendingReferrer) => {
-          setPendingReferrer(pendingReferrer);
-          fireConfetti();
-        }}
-      />
-    ) : isNarrowView ? null : (
-      <>
-        <Spacer height={32} />
-        <CongratulationsWidget referrer={referrer} />
-      </>
-    )
-  ) : null;
+  const loyaltyProgramWidget =
+    FEATURE_LOYALTY_FLOW === 'on' ? (
+      referralCodeWidgetVisible ? (
+        <ReferralCodeWidget
+          onSuccess={(pendingReferrer) => {
+            setPendingReferrer(pendingReferrer);
+            fireConfetti();
+          }}
+        />
+      ) : isNarrowView ? null : (
+        <>
+          <Spacer height={32} />
+          <CongratulationsWidget referrer={referrer} />
+        </>
+      )
+    ) : null;
 
   return (
     <>

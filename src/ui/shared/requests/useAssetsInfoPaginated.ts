@@ -5,12 +5,10 @@ import { getError } from 'src/shared/errors/getError';
 import { rejectAfterDelay } from 'src/shared/rejectAfterDelay';
 
 export function useAssetsInfoPaginatedQuery(
-  params: Omit<Parameters<typeof client.assetsInfo>[0], 'limit' | 'offset'>,
-  { suspense }: { suspense: boolean }
+  params: Omit<Parameters<typeof client.assetsInfo>[0], 'limit' | 'offset'>
 ) {
   const LIMIT = 30;
   const query = useInfiniteQuery({
-    suspense,
     queryKey: ['assetsInfoPaginated', LIMIT, params],
     queryFn: async ({
       pageParam: { limit, offset } = { limit: LIMIT, offset: 0 },

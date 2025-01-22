@@ -19,12 +19,12 @@ export function VerifyUser({
   buttonTitle?: React.ReactNode;
   onSuccess: () => void;
 }) {
-  const { data: user, isLoading } = useQuery({
+  const { data: user, isPending } = useQuery({
     queryKey: ['account/getExistingUser'],
     queryFn: () => {
       return accountPublicRPCPort.request('getExistingUser');
     },
-    useErrorBoundary: true,
+    throwOnError: true,
   });
   const loginMutation = useMutation({
     mutationFn: ({
@@ -42,7 +42,7 @@ export function VerifyUser({
     },
   });
   const inputId = useId();
-  if (isLoading) {
+  if (isPending) {
     return null;
   }
   return (
@@ -97,8 +97,8 @@ export function VerifyUser({
               </UIText>
             ) : null}
           </VStack>
-          <Button disabled={loginMutation.isLoading}>
-            {loginMutation.isLoading ? 'Checking...' : buttonTitle}
+          <Button disabled={loginMutation.isPending}>
+            {loginMutation.isPending ? 'Checking...' : buttonTitle}
           </Button>
         </VStack>
       </form>

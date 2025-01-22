@@ -97,7 +97,7 @@ export function Login() {
   const navigate = useNavigate();
   const {
     data: user,
-    isLoading,
+    isPending,
     error,
     isError,
   } = useQuery({
@@ -143,7 +143,7 @@ export function Login() {
   });
 
   useBodyStyle(useMemo(() => ({ backgroundColor: 'var(--white)' }), []));
-  if (isLoading) {
+  if (isPending) {
     return null;
   }
   if (isError) {
@@ -203,8 +203,8 @@ export function Login() {
               </UIText>
             ) : null}
           </VStack>
-          <Button form={formId} disabled={loginMutation.isLoading}>
-            {loginMutation.isLoading ? 'Checking...' : 'Unlock'}
+          <Button form={formId} disabled={loginMutation.isPending}>
+            {loginMutation.isPending ? 'Checking...' : 'Unlock'}
           </Button>
         </VStack>
       </form>

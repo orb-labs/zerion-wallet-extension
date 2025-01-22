@@ -32,11 +32,10 @@ export function useAddressBackendOrEvmPositions({
   const evmQuery = useEvmAddressPositions({
     address,
     chain: chain as Chain,
-    suspense: false,
     enabled: isSupportedByBackend != null && !isSupportedByBackend,
   });
 
   return isSupportedByBackend || isSupportedByBackend == null
     ? { data: addressPositions, isLoading }
-    : { data: evmQuery.data, isLoading: evmQuery.isLoading };
+    : { data: evmQuery.data, isLoading: evmQuery.isPending };
 }

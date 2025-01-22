@@ -12,7 +12,7 @@ import { PageColumn } from '../PageColumn';
 import { FillView } from '../FillView';
 
 export function VersionUpgrade({ children }: React.PropsWithChildren) {
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isPending, refetch } = useQuery({
     queryKey: ['checkVersion'],
     queryFn: () => checkVersion(),
     retry: false,
@@ -20,7 +20,7 @@ export function VersionUpgrade({ children }: React.PropsWithChildren) {
     staleTime: Infinity,
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
-    useErrorBoundary: true,
+    throwOnError: true,
   });
   const [ignoreWarning, setIgnoreWarning] = useState(false);
   const eraseMutation = useMutation({
@@ -28,12 +28,12 @@ export function VersionUpgrade({ children }: React.PropsWithChildren) {
       await accountPublicRPCPort.request('logout');
       return eraseAndUpdateToLatestVersion();
     },
-    useErrorBoundary: true,
+    throwOnError: true,
     onSuccess() {
       refetch();
     },
   });
-  if (isLoading) {
+  if (isPending) {
     return null;
   }
   if (
@@ -69,7 +69,7 @@ export function VersionUpgrade({ children }: React.PropsWithChildren) {
               <Button
                 kind="ghost"
                 style={{ color: 'var(--primary)', fontWeight: 'normal' }}
-                disabled={eraseMutation.isLoading}
+                disabled={eraseMutation.isPending}
                 onClick={() => {
                   eraseMutation.mutate();
                 }}

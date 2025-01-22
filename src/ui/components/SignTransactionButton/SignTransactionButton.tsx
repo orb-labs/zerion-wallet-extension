@@ -80,8 +80,8 @@ export const SignTransactionButton = React.forwardRef(
 
     useImperativeHandle(ref, () => ({ sendTransaction }));
 
-    const isLoading = isLoadingProp || sendTxMutation.isLoading;
-    const isSending = sendTxMutation.isLoading;
+    const isLoading = isLoadingProp || sendTxMutation.isPending;
+    const isSending = sendTxMutation.isPending;
 
     // there is a small delay after using a holdable button
     // button should be disabled after successful sign to prevent a duplicating call
@@ -130,7 +130,7 @@ export const SignTransactionButton = React.forwardRef(
               submittingText="Sending..."
               onClick={handleClick}
               success={sendTxMutation.isSuccess}
-              submitting={sendTxMutation.isLoading}
+              submitting={sendTxMutation.isPending}
               error={sendTxMutation.isError}
               disabled={disabled}
               kind={buttonKind}

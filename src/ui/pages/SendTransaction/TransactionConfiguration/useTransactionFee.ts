@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import type { Asset } from 'defi-sdk';
 import { isTruthy } from 'is-truthy-ts';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
 import type {
   EIP1559,
@@ -93,7 +93,7 @@ function useFeeEstimation(
     networkFeeConfiguration: NetworkFeeConfiguration | null;
     chainGasPrices: ChainGasPrice | null;
   },
-  { keepPreviousData = false } = {}
+  { shouldKeepPlaceholderData = false } = {}
 ) {
   const gas = getGasFromConfiguration(transaction, networkFeeConfiguration);
   if (!gas || Number(gas) === 0) {
@@ -101,8 +101,7 @@ function useFeeEstimation(
     throw new Error('gas field is expected to be found on Transaction object');
   }
   return useQuery({
-    keepPreviousData,
-    suspense: !keepPreviousData,
+    placeholderData: shouldKeepPlaceholderData ? keepPreviousData : undefined,
     queryKey: [
       'feeEstimation',
       chain,
@@ -231,19 +230,19 @@ export function useTransactionFee({
   onFeeValueCommonReady,
   networkFeeConfiguration,
   chainGasPrices,
-  keepPreviousData = false,
+  shouldKeepPlaceholderData = false,
 }: {
   address: string;
   transaction: IncomingTransaction;
   chain: Chain;
   onFeeValueCommonReady: null | ((value: string) => void);
   networkFeeConfiguration: NetworkFeeConfiguration | null;
-  keepPreviousData?: boolean;
+  shouldKeepPlaceholderData?: boolean;
   chainGasPrices: ChainGasPrice | null;
 }) {
   const feeEstimationQuery = useFeeEstimation(
     { chain, transaction, networkFeeConfiguration, chainGasPrices },
-    { keepPreviousData }
+    { shouldKeepPlaceholderData }
   );
 
   const feeEstimation = feeEstimationQuery.data?.feeEstimation;

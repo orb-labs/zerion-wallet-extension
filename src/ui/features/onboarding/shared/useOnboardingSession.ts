@@ -11,13 +11,12 @@ export function useOnboardingSession({
 }) {
   const navigate = useNavigate();
 
-  const { data: existingUser, isLoading } = useQuery({
+  const { data: existingUser, isPending } = useQuery({
     queryKey: ['getCurrentUser'],
     queryFn: async () => {
       const result = await getCurrentUser();
       return result || null;
     },
-    suspense: false,
     refetchOnWindowFocus: false,
   });
 
@@ -33,6 +32,6 @@ export function useOnboardingSession({
   }, [existingUser, navigate, navigateOnExistingUser]);
 
   return {
-    sessionDataIsLoading: isLoading,
+    sessionDataIsLoading: isPending,
   };
 }

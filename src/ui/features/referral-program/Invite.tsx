@@ -352,7 +352,7 @@ export function Invite() {
   const myReferralCode = walletMeta.membership.referralCode || null;
   const myReferralLink = walletMeta.membership.referralLink;
 
-  if (!selectedWallet || !walletMeta || walletGroupsQuery.isLoading) {
+  if (!selectedWallet || !walletMeta || walletGroupsQuery.isPending) {
     return null;
   }
 

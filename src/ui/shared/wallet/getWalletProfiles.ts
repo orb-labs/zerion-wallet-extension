@@ -42,8 +42,7 @@ export function useProfileNft(address: string) {
       const result = await fetchWalletNFT(normalizedAddress);
       return result;
     },
-    suspense: false,
-    useErrorBoundary: false,
+    throwOnError: false,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     staleTime: 60000,

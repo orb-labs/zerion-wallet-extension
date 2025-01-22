@@ -98,7 +98,7 @@ export const SignMessageButton = React.forwardRef(function SignMessageButton(
   useImperativeHandle(ref, () => ({ personalSign, signTypedData_v4 }));
 
   const isLoading =
-    personalSignMutation.isLoading || signTypedData_v4Mutation.isLoading;
+    personalSignMutation.isPending || signTypedData_v4Mutation.isPending;
   const isSuccess =
     personalSignMutation.isSuccess || signTypedData_v4Mutation.isSuccess;
   const isError =

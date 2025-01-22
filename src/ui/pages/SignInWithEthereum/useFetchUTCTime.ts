@@ -9,7 +9,6 @@ export function useFetchUTCTime() {
       );
       return Number(text);
     },
-    suspense: false,
     retry: false,
   });
 }

@@ -26,7 +26,7 @@ export function ImportKey({
   const { isNarrowView } = useWindowSizeStore();
   const [validation, setValidation] = useState<ValidationResult | null>(null);
 
-  const { mutate, isLoading } = useMutation({
+  const { mutate, isPending } = useMutation({
     mutationFn: async (value: string) => {
       setValidation(null);
       const secretKey = prepareUserInputSeedOrPrivateKey(value);
@@ -80,11 +80,11 @@ export function ImportKey({
             <Button
               kind="primary"
               style={{ width: '100%' }}
-              disabled={isLoading}
+              disabled={isPending}
             >
               <HStack gap={8} alignItems="center" justifyContent="center">
                 <span>Import wallet</span>
-                {isLoading ? <CircleSpinner /> : null}
+                {isPending ? <CircleSpinner /> : null}
               </HStack>
             </Button>
             {!validation || validation.valid ? null : (

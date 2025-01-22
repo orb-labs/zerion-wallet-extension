@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useSelectorStore } from '@store-unit/react';
 import type { IncomingTransaction } from 'src/modules/ethereum/types/IncomingTransaction';
 import type { SendFormView } from '@zeriontech/transactions';
@@ -31,8 +31,7 @@ export function EstimateTransactionGas({
 
   const asset = tokenItem?.asset;
   const { data: transactionData } = useQuery({
-    suspense: false,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
     queryKey: [
       'sendForm/createSendTransaction',
       type,
@@ -82,7 +81,7 @@ export function EstimateTransactionGas({
   const transaction = transactionData?.transaction ?? null;
   const estimateGasQuery = useEstimateGas({
     transaction,
-    keepPreviousData: true,
+    shouldKeepPreviousData: true,
   });
 
   const gas = estimateGasQuery.data;

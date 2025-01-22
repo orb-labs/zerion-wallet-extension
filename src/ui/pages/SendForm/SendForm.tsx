@@ -108,7 +108,7 @@ function SendFormComponent() {
   const { data: wallet } = useQuery({
     queryKey: ['wallet/uiGetCurrentWallet'],
     queryFn: () => walletPort.request('uiGetCurrentWallet'),
-    useErrorBoundary: true,
+    throwOnError: true,
   });
   const USE_PAYMASTER_FEATURE = true;
 
@@ -130,7 +130,7 @@ function SendFormComponent() {
   const { data } = useWalletPortfolio(
     { addresses: [address], currency },
     { source: useHttpClientSource() },
-    { enabled: ready, suspense: true }
+    { enabled: ready }
   );
   const portfolioDecomposition = data?.data;
 
@@ -287,9 +287,8 @@ function SendFormComponent() {
   );
   const eligibilityQuery = useQuery({
     enabled: paymasterPossible,
-    suspense: false,
     staleTime: 120000,
-    useErrorBoundary: false,
+    throwOnError: false,
     queryKey: [
       'paymaster/check-eligibility',
       chainId,
@@ -342,7 +341,7 @@ function SendFormComponent() {
   const {
     mutate: sendTransaction,
     data: transactionHash,
-    isLoading,
+    isPending,
     reset,
     isSuccess,
     ...sendTxMutation
@@ -677,7 +676,7 @@ function SendFormComponent() {
               ref={signTxBtnRef}
               form={formId}
               wallet={wallet}
-              disabled={isLoading}
+              disabled={isPending}
               holdToSign={false}
             />
           ) : null}

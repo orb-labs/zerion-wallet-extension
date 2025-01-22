@@ -16,7 +16,6 @@ export function XpDropBanner({ address }: { address: string }) {
   const { pathname } = useLocation();
   const { data: walletsMeta } = useWalletsMetaByChunks({
     addresses: [address],
-    suspense: false,
   });
 
   const walletMeta = walletsMeta?.[0];

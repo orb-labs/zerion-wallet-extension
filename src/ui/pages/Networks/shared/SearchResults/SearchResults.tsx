@@ -19,7 +19,7 @@ export function SearchResults({
   testnetMode: boolean;
 }) {
   const { pathname } = useLocation();
-  const { networks, isLoading } = useSearchNetworks({ query });
+  const { networks, isPending } = useSearchNetworks({ query });
   const items = useMemo(() => {
     const allNetworks = testnetMode
       ? networks?.getNetworks()
@@ -27,7 +27,7 @@ export function SearchResults({
     return allNetworks?.filter(filterNetworksByQuery(query));
   }, [query, networks, testnetMode]);
 
-  if (isLoading || !networks) {
+  if (isPending || !networks) {
     return <ViewLoading kind="network" />;
   }
   if (!items?.length) {

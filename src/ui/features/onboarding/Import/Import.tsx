@@ -83,7 +83,7 @@ function ImportWallet() {
     [setSearchParams]
   );
 
-  const { mutate: createUserAndWallet, isLoading } = useMutation({
+  const { mutate: createUserAndWallet, isPending } = useMutation({
     mutationFn: async ({
       password,
       wallets,
@@ -128,7 +128,7 @@ function ImportWallet() {
       }
       setShowError(true);
     },
-    useErrorBoundary: true,
+    throwOnError: true,
   });
 
   const showErrorBoundary = useErrorBoundary();
@@ -167,7 +167,7 @@ function ImportWallet() {
   return (
     <VStack gap={isNarrowView ? 16 : 56}>
       <div className={helperStyles.container} style={{ minHeight: 430 }}>
-        {isLoading ? (
+        {isPending ? (
           <div className={helperStyles.loadingOverlay}>
             <UIText kind="headline/hero" className={helperStyles.loadingTitle}>
               Importing Wallet

@@ -22,12 +22,12 @@ export function VerifyUser({ onSuccess }: { onSuccess: () => void }) {
 
   const goBack = useGoBack();
 
-  const { data: user, isLoading } = useQuery({
+  const { data: user, isPending } = useQuery({
     queryKey: ['account/getExistingUser'],
     queryFn: () => {
       return accountPublicRPCPort.request('getExistingUser');
     },
-    useErrorBoundary: true,
+    throwOnError: true,
   });
   const loginMutation = useMutation({
     mutationFn: ({
@@ -47,7 +47,7 @@ export function VerifyUser({ onSuccess }: { onSuccess: () => void }) {
 
   const inputId = useId();
 
-  if (isLoading) {
+  if (isPending) {
     return null;
   }
 
@@ -132,8 +132,8 @@ export function VerifyUser({ onSuccess }: { onSuccess: () => void }) {
                     </UIText>
                   ) : null}
                 </VStack>
-                <Button kind="primary" disabled={loginMutation.isLoading}>
-                  {loginMutation.isLoading
+                <Button kind="primary" disabled={loginMutation.isPending}>
+                  {loginMutation.isPending
                     ? 'Checking password...'
                     : 'Reveal Recovery Phrase'}
                 </Button>
