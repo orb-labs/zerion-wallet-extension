@@ -195,7 +195,7 @@ export function SignMessage() {
   const { data: wallet, isLoading } = useQuery({
     queryKey: ['wallet/uiGetCurrentWallet'],
     queryFn: () => walletPort.request('uiGetCurrentWallet'),
-    useErrorBoundary: true,
+    throwOnError: true,
   });
   if (isLoading || !wallet) {
     return null;

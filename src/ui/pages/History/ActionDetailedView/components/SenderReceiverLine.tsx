@@ -39,7 +39,6 @@ function SenderReceiver({
     queryFn: () =>
       walletPort.request('uiGetWalletByAddress', { address, groupId: null }),
     enabled: Boolean(address),
-    suspense: false,
   });
 
   const { value: walletName } = useProfileName(

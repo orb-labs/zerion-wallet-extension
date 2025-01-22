@@ -86,7 +86,6 @@ function WalletMediaData({
   handleRequest: (request: ControllerRequest) => Promise<unknown>;
 }) {
   const { data } = useQuery({
-    suspense: false,
     queryKey: ['iframe/wallet-info', wallet.address],
     queryFn: () =>
       handleRequest({

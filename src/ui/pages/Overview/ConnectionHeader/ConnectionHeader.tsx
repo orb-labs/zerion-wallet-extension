@@ -40,19 +40,19 @@ function NetworksDisclosureButton({
   value: string;
   openDialog: () => void;
 }) {
-  const { networks, isLoading } = useNetworks();
+  const { networks, isPending } = useNetworks();
   const { preferences } = usePreferences();
   const selectedNetwork = networks?.getNetworkByName(createChain(value));
 
   const { data: mainnetNetwork } = useMainnetNetwork({
     chain: value,
     enabled:
-      Boolean(preferences?.testnetMode?.on) && !isLoading && !selectedNetwork,
+      Boolean(preferences?.testnetMode?.on) && !isPending && !selectedNetwork,
   });
   const chain = createChain(value);
   const network = selectedNetwork || mainnetNetwork;
 
-  if (isLoading) {
+  if (isPending) {
     return null;
   }
 
@@ -115,7 +115,7 @@ export function ConnectionHeader() {
   const { data: tabData } = useQuery({
     queryKey: ['activeTab/origin'],
     queryFn: getActiveTabOrigin,
-    useErrorBoundary: true,
+    throwOnError: true,
   });
   const activeTabOrigin = tabData?.tabOrigin;
   const activeTabHostname = tabData?.url.hostname;
@@ -128,14 +128,13 @@ export function ConnectionHeader() {
     queryKey: ['requestChainForOrigin', activeTabOrigin],
     queryFn: () => requestChainForOrigin(activeTabOrigin),
     enabled: Boolean(activeTabOrigin),
-    useErrorBoundary: true,
-    suspense: false,
+    throwOnError: true,
   });
 
   const switchChainMutation = useMutation({
     mutationFn: ({ chain, origin }: { chain: string; origin: string }) =>
       walletPort.request('switchChainForOrigin', { chain, origin }),
-    useErrorBoundary: true,
+    throwOnError: true,
     onSuccess: () => chainQuery.refetch(),
   });
 

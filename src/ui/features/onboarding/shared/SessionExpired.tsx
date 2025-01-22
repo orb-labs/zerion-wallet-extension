@@ -8,17 +8,16 @@ import SessionExpiredImg from '../assets/session-expired.png';
 import * as helperStyles from '../shared/helperStyles.module.css';
 
 export function SessionExpired({ onRestart }: { onRestart: () => void }) {
-  const { data: existingUser, isLoading } = useQuery({
+  const { data: existingUser, isPending } = useQuery({
     queryKey: ['getCurrentUser'],
     queryFn: async () => {
       const result = await getCurrentUser();
       return result || null;
     },
-    suspense: false,
     refetchOnWindowFocus: false,
   });
 
-  if (isLoading) {
+  if (isPending) {
     return null;
   }
 

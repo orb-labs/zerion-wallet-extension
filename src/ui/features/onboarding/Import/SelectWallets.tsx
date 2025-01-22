@@ -30,15 +30,14 @@ export function SelectWallets({
   invariant(mnemonic, 'Seed phrase is empty');
   const [showInactiveWallets, setShowInactiveWallets] = useState(false);
 
-  const { data: wallets, isLoading } = useQuery({
+  const { data: wallets, isPending } = useQuery({
     queryKey: ['getFirstNMnemonicWallets', mnemonic, count],
     queryFn: async () => {
       await wait(1000);
       const phrase = encodeForMasking(mnemonic);
       return getFirstNMnemonicWallets({ phrase, n: count });
     },
-    useErrorBoundary: true,
-    suspense: false,
+    throwOnError: true,
   });
 
   const { value: activeWallets, isLoading: activeWalletsAreLoading } =
@@ -77,7 +76,7 @@ export function SelectWallets({
     [existingAddresses]
   );
 
-  return shouldWaitForValue && (isLoading || activeWalletsAreLoading) ? (
+  return shouldWaitForValue && (isPending || activeWalletsAreLoading) ? (
     <div className={helperStyles.loadingOverlay}>
       <UIText kind="headline/hero" className={helperStyles.loadingTitle}>
         Looking for Wallets

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { persistentQuery } from 'src/ui/shared/requests/queryClientPersistence';
 import { ZerionAPI } from '../zerion-api.client';
 import type { Params } from '../requests/wallet-get-portfolio';
@@ -8,23 +8,20 @@ export function useWalletPortfolio(
   params: Params,
   { source }: BackendSourceParams,
   {
-    suspense = false,
     enabled = true,
-    keepPreviousData = false,
+    shouldKeepPreviousData = false,
     refetchInterval,
   }: {
-    suspense?: boolean;
     enabled?: boolean;
-    keepPreviousData?: boolean;
+    shouldKeepPreviousData?: boolean;
     refetchInterval?: number;
   } = {}
 ) {
   return useQuery({
     queryKey: persistentQuery(['walletGetPortfolio', params, source]),
     queryFn: () => ZerionAPI.walletGetPortfolio(params, { source }),
-    suspense,
     enabled,
-    keepPreviousData,
+    placeholderData: shouldKeepPreviousData ? keepPreviousData : undefined,
     staleTime: 20000,
     refetchInterval,
   });

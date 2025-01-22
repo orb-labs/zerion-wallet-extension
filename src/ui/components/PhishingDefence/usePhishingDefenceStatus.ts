@@ -8,9 +8,8 @@ export function usePhishingDefenceStatus(origin?: string | null) {
       walletPort.request('getDappSecurityStatus', {
         url: origin,
       }),
-    cacheTime: 0,
-    suspense: false,
+    gcTime: 0,
     refetchInterval: (data) =>
-      data?.status === 'loading' || data?.status === 'unknown' ? 100 : false,
+      data?.state?.status === 'pending' ? 1000 : false,
   });
 }

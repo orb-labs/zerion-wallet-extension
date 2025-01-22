@@ -36,7 +36,7 @@ function RevokeAllPermissionsComponent({
 }) {
   const removeAllOriginsMutation = useMutation({
     mutationFn: () => walletPort.request('removeAllOriginPermissions'),
-    useErrorBoundary: true,
+    throwOnError: true,
     onSuccess: onRevokeAll,
   });
   const dialogRef = useRef<HTMLDialogElementInterface | null>(null);
@@ -58,7 +58,7 @@ function RevokeAllPermissionsComponent({
             },
             component: (
               <UIText kind="body/regular" color="var(--negative-500)">
-                {removeAllOriginsMutation.isLoading
+                {removeAllOriginsMutation.isPending
                   ? 'Loading...'
                   : 'Disconnect All'}
               </UIText>
@@ -228,13 +228,12 @@ function EmptyView({
 function ConnectedSitesMain() {
   const {
     data: allConnectedSites,
-    isLoading,
+    isPending,
     ...connectedSitesQuery
   } = useQuery({
     queryKey: ['getPermissionsWithWallets'],
     queryFn: getPermissionsWithWallets,
-    useErrorBoundary: true,
-    suspense: true,
+    throwOnError: true,
   });
   const [searchQuery, setSearchQuery] = useState<string>('');
   const searchInputRef = useRef<InputHandle | null>(null);
@@ -262,7 +261,7 @@ function ConnectedSitesMain() {
           <Spacer height={24} />
         </>
       ) : null}
-      {isLoading ? null : itemsToDisplay?.length ? (
+      {isPending ? null : itemsToDisplay?.length ? (
         <ConnectedSitesList
           showRevokeAll={!searchQuery}
           items={itemsToDisplay}

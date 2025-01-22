@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react';
-import { useQuery, hashQueryKey } from '@tanstack/react-query';
+import { useQuery, hashKey, keepPreviousData } from '@tanstack/react-query';
 import { queryClient } from 'src/ui/shared/requests/queryClient';
 import { emitter } from 'src/ui/shared/events';
 import {
@@ -31,15 +31,14 @@ export function useNetworks(chains?: string[]) {
       const stringifiable = queryKey.map((x) =>
         x instanceof NetworksStore ? x.toString() : x
       );
-      return hashQueryKey(stringifiable);
+      return hashKey(stringifiable);
     },
     queryFn: () => {
       invariant(networksStore, 'Enable query when networks store is ready');
       return networksStore.load(chains ? { chains } : undefined);
     },
     staleTime: 1000 * 60 * 5,
-    suspense: false,
-    useErrorBoundary: true,
+    throwOnError: true,
     enabled: Boolean(networksStore),
   });
 
@@ -96,8 +95,7 @@ export function useMainnetNetwork({
       return network ?? null;
     },
     staleTime: 1000 * 60 * 5,
-    suspense: false,
-    useErrorBoundary: false,
+    throwOnError: false,
   });
 }
 
@@ -117,8 +115,7 @@ export function useSearchNetworks({ query = '' }: { query?: string }) {
       emitter.emit('networksSearchResponse', query, data.length);
       return data;
     },
-    suspense: false,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
   const { networks } = useNetworks();
   return { networks, ...queryResult };

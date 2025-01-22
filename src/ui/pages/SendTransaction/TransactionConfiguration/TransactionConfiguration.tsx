@@ -88,16 +88,14 @@ function NetworkFeeLine({
   paymasterEligible: boolean;
   keepPreviousData?: boolean;
 }) {
-  const { data: chainGasPrices = null } = useGasPrices(chain, {
-    suspense: true,
-  });
+  const { data: chainGasPrices = null } = useGasPrices(chain);
   const transactionFee = useTransactionFee({
     address: transaction.from,
     transaction,
     chain,
     onFeeValueCommonReady,
     networkFeeConfiguration: configuration.networkFee,
-    keepPreviousData,
+    shouldKeepPlaceholderData: keepPreviousData,
     chainGasPrices,
   });
 

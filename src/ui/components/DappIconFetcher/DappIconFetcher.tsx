@@ -8,8 +8,8 @@ interface Props {
 }
 
 export function DappIconFetcher({ url: dappUrl, render }: Props) {
-  const { data: iconUrl, isLoading } = useFetchDappIcon(dappUrl);
-  if (isLoading) {
+  const { data: iconUrl, isPending } = useFetchDappIcon(dappUrl);
+  if (isPending) {
     return render(null);
   }
   const src = iconUrl || `${dappUrl}/favicon.png`;

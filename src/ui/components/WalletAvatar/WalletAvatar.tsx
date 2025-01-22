@@ -18,9 +18,9 @@ export function WalletAvatar({
   icon?: React.ReactNode;
   onReady?(): void;
 }) {
-  const { data: nft, isLoading } = useProfileNft(address);
+  const { data: nft, isPending } = useProfileNft(address);
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <div style={{ width: size, height: size, position: 'relative' }}>
         {icon}

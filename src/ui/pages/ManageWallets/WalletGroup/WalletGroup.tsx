@@ -106,7 +106,7 @@ function EditableWalletGroupName({
             setValue(name);
           }}
         />
-        {renameMutation.isLoading ? (
+        {renameMutation.isPending ? (
           <CircleSpinner style={{ display: 'inline-block' }} />
         ) : null}
       </div>
@@ -202,7 +202,7 @@ export function WalletGroup() {
   const { refetch } = useWalletGroups();
   const removeWalletGroupMutation = useMutation({
     mutationFn: () => walletPort.request('removeWalletGroup', { groupId }),
-    useErrorBoundary: true,
+    throwOnError: true,
     onSuccess() {
       refetch();
       navigate(-1);
@@ -360,7 +360,7 @@ export function WalletGroup() {
                     <UIText kind="body/accent" color="var(--negative-500)">
                       Remove Group
                     </UIText>
-                    {removeWalletGroupMutation.isLoading ? (
+                    {removeWalletGroupMutation.isPending ? (
                       <CircleSpinner style={{ display: 'inline-block' }} />
                     ) : null}
                   </HStack>

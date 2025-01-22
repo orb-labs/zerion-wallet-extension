@@ -21,7 +21,6 @@ export function Receive() {
   const { data: domain } = useQuery({
     queryKey: persistentQuery([lookupAddressNameKey, address]),
     queryFn: () => lookupAddressName(address),
-    suspense: false,
   });
 
   return (

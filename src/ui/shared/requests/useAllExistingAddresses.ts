@@ -12,7 +12,6 @@ export function useAllExistingMnemonicAddresses() {
   const { data: walletGroups } = useQuery({
     queryKey: ['wallet/uiGetWalletGroups'],
     queryFn: () => walletPort.request('uiGetWalletGroups'),
-    useErrorBoundary: true,
     staleTime: 30000,
   });
   return useMemo(
@@ -29,7 +28,6 @@ export function useAllSignerOrHwAddresses() {
   const { data: walletGroups } = useQuery({
     queryKey: ['wallet/uiGetWalletGroups'],
     queryFn: () => walletPort.request('uiGetWalletGroups'),
-    useErrorBoundary: true,
     staleTime: 30000,
   });
   return useMemo(

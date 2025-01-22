@@ -31,14 +31,13 @@ export function SendTransactionConfirmation({
   const { data: wallet } = useQuery({
     queryKey: ['wallet/uiGetCurrentWallet'],
     queryFn: () => walletPort.request('uiGetCurrentWallet'),
-    useErrorBoundary: true,
+    throwOnError: true,
   });
 
   const { data: transaction } = useQuery({
-    suspense: false, // "true" makes confirmation dialog flicker
     queryKey: QUERY_KEY,
     queryFn: getTransaction,
-    useErrorBoundary: true,
+    throwOnError: true,
   });
   useEffect(() => {
     return () => {

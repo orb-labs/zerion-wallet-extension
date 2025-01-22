@@ -65,7 +65,7 @@ export function TransactionConfirmationView({
       onGasbackReady?.(gasbackValue);
     }
   }, [gasbackValue, onGasbackReady]);
-  if (query.isLoading) {
+  if (query.isPending) {
     return null;
   }
 

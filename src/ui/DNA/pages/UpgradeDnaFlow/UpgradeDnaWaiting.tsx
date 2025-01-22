@@ -37,7 +37,6 @@ export function UpgradeDnaWaiting() {
       const dna = data.data?.['nft-position'];
       return dna || null;
     },
-    suspense: false,
     refetchInterval: 3000,
   });
 

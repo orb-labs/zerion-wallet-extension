@@ -660,7 +660,7 @@ function MultiChainPositions({
   portfolioDecomposition: WalletPortfolio | null;
 } & Omit<React.ComponentProps<typeof PositionList>, 'items'>) {
   const { currency } = useCurrency();
-  const { data, isLoading } = useHttpAddressPositions(
+  const { data, isPending } = useHttpAddressPositions(
     { addresses: [address], currency },
     { source: useHttpClientSource() },
     { refetchInterval: usePositionsRefetchInterval(40000) }
@@ -682,7 +682,7 @@ function MultiChainPositions({
 
   const groupedPositions = groupPositionsByDapp(items);
 
-  if (isLoading) {
+  if (isPending) {
     return renderLoadingView() as JSX.Element;
   }
   if (!items || items.length === 0) {
@@ -908,7 +908,7 @@ export function Positions({
       />
     );
   } else {
-    if (isLoading || portfolioQuery.isLoading) {
+    if (isLoading || portfolioQuery.isPending) {
       return renderLoadingViewForNetwork();
     }
     invariant(networks, `Failed to load network info for ${chain}`);

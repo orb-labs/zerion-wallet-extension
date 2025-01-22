@@ -300,7 +300,7 @@ function SettingsMain() {
             <HStack gap={8} alignItems="center" justifyContent="center">
               <LockIcon style={{ color: 'var(--white)' }} />
               <UIText kind="body/accent" color="var(--white)">
-                {logout.isLoading ? 'Locking...' : 'Lock Wallet'}
+                {logout.isPending ? 'Locking...' : 'Lock Wallet'}
               </UIText>
             </HStack>
           </Button>

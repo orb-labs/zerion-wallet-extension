@@ -58,7 +58,7 @@ export function SelectDna() {
 
   const {
     mutate: upgradeDna,
-    isLoading,
+    isPending,
     error,
   } = useMutation({
     mutationFn: async () => {
@@ -111,7 +111,7 @@ export function SelectDna() {
       >
         {VALUE_TEXTS[value].title}
       </UIText>
-      {isLoading ? (
+      {isPending ? (
         <VStack
           gap={40}
           style={{

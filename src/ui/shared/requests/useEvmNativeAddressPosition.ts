@@ -9,16 +9,13 @@ export function useEvmNativeAddressPosition({
   chain,
   staleTime,
   enabled = true,
-  suspense = true,
 }: {
   address: string | null;
   chain: Chain;
   staleTime: number;
   enabled?: boolean;
-  suspense?: boolean;
 }) {
   return useQuery({
-    suspense,
     staleTime,
     queryKey: persistentQuery([
       'eth_getBalance/nativeAddressEvmPosition',

@@ -49,7 +49,7 @@ export function RecoveryPhrase({
 
   const {
     data: encoded,
-    isLoading,
+    isPending,
     isError,
     error,
   } = isPendingWallet
@@ -101,7 +101,7 @@ export function RecoveryPhrase({
             a password manager or write them down and store in a secure location
           </UIText>
           <Spacer height={40} />
-          {isLoading ? (
+          {isPending ? (
             <div
               style={{
                 height: 100,
@@ -137,7 +137,7 @@ export function RecoveryPhrase({
             </Surface>
           )}
           <Spacer height={4} />
-          {isLoading || error ? (
+          {isPending || error ? (
             <div style={{ height: 180 }} />
           ) : (
             <>
@@ -162,7 +162,7 @@ export function RecoveryPhrase({
               <Spacer height={32} />
               <VStack gap={16}>
                 <Button
-                  disabled={isLoading || Boolean(error)}
+                  disabled={isPending || Boolean(error)}
                   onClick={() => {
                     emptyClipboard();
                     onNextStep();

@@ -116,7 +116,7 @@ function ScreenCover() {
 }
 
 function Options() {
-  const { data: walletGroups, isLoading } = useWalletGroups();
+  const { data: walletGroups, isPending } = useWalletGroups();
   const [params] = useSearchParams();
   const mnemonicGroups = useMemo(
     () =>
@@ -128,7 +128,7 @@ function Options() {
 
   useBackgroundKind(whiteBackgroundKind);
 
-  if (isLoading) {
+  if (isPending) {
     return null;
   }
 
@@ -242,7 +242,7 @@ function ExistingWalletOptions() {
 function WalletGroupSelect() {
   const [params] = useSearchParams();
   const beforeCreate = params.get('beforeCreate');
-  const { data: walletGroups, isLoading } = useWalletGroups();
+  const { data: walletGroups, isPending } = useWalletGroups();
   const mnemonicGroups = useMemo(
     () =>
       walletGroups?.filter((group) =>
@@ -252,7 +252,7 @@ function WalletGroupSelect() {
   );
   useBackgroundKind(whiteBackgroundKind);
   const title = 'Select Backup';
-  if (isLoading) {
+  if (isPending) {
     return null;
   }
   if (!mnemonicGroups) {

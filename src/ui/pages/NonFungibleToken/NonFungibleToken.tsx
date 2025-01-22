@@ -33,7 +33,7 @@ export function NonFungibleToken() {
   const { data: wallet } = useQuery({
     queryKey: ['wallet/uiGetCurrentWallet'],
     queryFn: () => walletPort.request('uiGetCurrentWallet'),
-    useErrorBoundary: true,
+    throwOnError: true,
   });
 
   const [contract_address, token_id] = useMemo(
@@ -201,12 +201,12 @@ export function NonFungibleToken() {
                         justifyContent="center"
                       >
                         <div>Set as Active</div>
-                        {promoteTokenMutation.isLoading ? (
+                        {promoteTokenMutation.isPending ? (
                           <CircleSpinner />
                         ) : null}
                       </HStack>
                     }
-                    disabled={promoteTokenMutation.isLoading}
+                    disabled={promoteTokenMutation.isPending}
                     holdToSign={false}
                   />
                 )}

@@ -7,12 +7,11 @@ export function usePendingRecoveryPhrase({ enabled }: { enabled: boolean }) {
     queryKey: ['getPendingRecoveryPhrase'],
     queryFn: () => walletPort.request('getPendingRecoveryPhrase'),
     enabled,
-    suspense: false,
     retry: 0,
-    cacheTime: 0 /** sensitive value, prevent from being cached */,
+    gcTime: 0 /** sensitive value, prevent from being cached */,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    useErrorBoundary: false,
+    throwOnError: false,
   });
 }
 
@@ -33,11 +32,10 @@ export function useRecoveryPhrase({
       return mnemonic.phrase;
     },
     enabled,
-    suspense: false,
     retry: 0,
-    cacheTime: 0 /** sensitive value, prevent from being cached */,
+    gcTime: 0 /** sensitive value, prevent from being cached */,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    useErrorBoundary: false,
+    throwOnError: false,
   });
 }

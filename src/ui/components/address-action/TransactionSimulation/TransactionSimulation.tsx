@@ -1,6 +1,6 @@
 import React from 'react';
 import { VStack } from 'src/ui/ui-kit/VStack';
-import { hashQueryKey, useQuery } from '@tanstack/react-query';
+import { hashKey, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { RenderArea } from 'react-area';
 import { Client } from 'defi-sdk';
 import { useDefiSdkClient } from 'src/modules/defi-sdk/useDefiSdkClient';
@@ -44,7 +44,7 @@ export function useTxInterpretQuery({
     queryKey: ['interpretTransaction', transaction, currency, client],
     queryKeyHashFn: (queryKey) => {
       const key = queryKey.map((x) => (x instanceof Client ? x.url : x));
-      return hashQueryKey(key);
+      return hashKey(key);
     },
     queryFn: () => {
       invariant(transaction.from, 'transaction must have a from value');
@@ -56,9 +56,8 @@ export function useTxInterpretQuery({
         client,
       });
     },
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
     staleTime: 20000,
-    suspense: false,
     retry: 1,
   });
 }
@@ -92,7 +91,7 @@ export function TransactionSimulation({
   const { data: wallet } = useQuery({
     queryKey: ['wallet/uiGetCurrentWallet'],
     queryFn: () => walletPort.request('uiGetCurrentWallet'),
-    useErrorBoundary: true,
+    throwOnError: true,
   });
 
   const transactionAction =
@@ -116,7 +115,7 @@ export function TransactionSimulation({
     ],
     queryKeyHashFn: (queryKey) => {
       const key = queryKey.map((x) => (x instanceof Client ? x.url : x));
-      return hashQueryKey(key);
+      return hashKey(key);
     },
     queryFn: () => {
       return transaction && networks && transactionAction
@@ -134,10 +133,10 @@ export function TransactionSimulation({
         : null;
     },
     staleTime: Infinity,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
     enabled:
       Boolean(transaction) && Boolean(networks) && Boolean(transactionAction),
-    useErrorBoundary: true,
+    throwOnError: true,
   });
 
   const network = chain ? networks?.getNetworkByName(chain) || null : null;
@@ -150,12 +149,11 @@ export function TransactionSimulation({
   // in TransactionConfirmationView
   const paymasterTxInterpretQuery = useQuery({
     enabled: Boolean(network?.supports_simulations) && paymasterEligible,
-    suspense: false,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
     queryKey: ['interpret/typedData', client, currency, transaction, source],
     queryKeyHashFn: (queryKey) => {
       const key = queryKey.map((x) => (x instanceof Client ? x.url : x));
-      return hashQueryKey(key);
+      return hashKey(key);
     },
     queryFn: async () => {
       invariant(transaction.from, 'transaction must have a from value');

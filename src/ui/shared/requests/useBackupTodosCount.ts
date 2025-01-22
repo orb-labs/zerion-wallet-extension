@@ -7,7 +7,6 @@ function useNoBackupCount() {
     queryFn: () => {
       return walletPort.request('getNoBackupCount');
     },
-    useErrorBoundary: true,
   });
 }
 export function useBackupTodosCount() {

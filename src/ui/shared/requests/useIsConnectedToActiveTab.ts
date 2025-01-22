@@ -6,7 +6,6 @@ export function useIsConnectedToActiveTab(address: string) {
   const { data } = useQuery({
     queryKey: ['activeTab/origin'],
     queryFn: getActiveTabOrigin,
-    useErrorBoundary: true,
   });
   const tabOrigin = data?.tabOrigin;
   return useQuery({

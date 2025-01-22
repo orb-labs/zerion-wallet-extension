@@ -47,7 +47,6 @@ export function AbilityPage() {
   const { data } = useQuery({
     queryKey: ['getAbility', singleAddressNormalized, ability_uid],
     queryFn: () => getAbility(singleAddressNormalized, ability_uid),
-    suspense: false,
     enabled: ready,
   });
 
@@ -57,7 +56,7 @@ export function AbilityPage() {
 
   const { data: feedData, refetch, isFetching } = useFeedInfo();
 
-  const { mutate: mark, isLoading: markLoading } = useMutation({
+  const { mutate: mark, isPending: markLoading } = useMutation({
     mutationFn: ({
       ability,
       action,
@@ -70,7 +69,7 @@ export function AbilityPage() {
     },
   });
 
-  const { mutate: unmark, isLoading: unmarkLoading } = useMutation({
+  const { mutate: unmark, isPending: unmarkLoading } = useMutation({
     mutationFn: (abilityId: string) => unmarkAbility({ abilityId }),
     onSuccess: () => {
       refetch();

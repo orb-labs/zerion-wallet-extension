@@ -25,7 +25,6 @@ export function WalletSourceIcon({
     queryKey: ['wallet/uiGetWalletByAddress', address, groupId],
     queryFn: () =>
       walletPort.request('uiGetWalletByAddress', { address, groupId }),
-    suspense: false,
   });
 
   if (!wallet) {

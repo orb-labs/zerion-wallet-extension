@@ -21,12 +21,10 @@ async function getEvmAddressPositions({
 export function useEvmAddressPositions({
   address,
   chain,
-  suspense = false,
   enabled = true,
 }: {
   address: string | null;
   chain: Chain;
-  suspense?: boolean;
   enabled?: boolean;
 }) {
   return useQuery({
@@ -43,7 +41,6 @@ export function useEvmAddressPositions({
             networks,
           });
     },
-    suspense,
     enabled: enabled && Boolean(address),
   });
 }

@@ -90,7 +90,6 @@ export function WalletSelect() {
   const { data: walletGroups, isLoading: isLoadingWalletGroups } = useQuery({
     queryKey: ['wallet/uiGetWalletGroups'],
     queryFn: () => walletPort.request('uiGetWalletGroups'),
-    useErrorBoundary: true,
   });
   const ownedGroups = useMemo(
     () =>

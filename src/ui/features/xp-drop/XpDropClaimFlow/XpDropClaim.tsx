@@ -398,7 +398,7 @@ export function XpDropClaim() {
     : selectedWalletMeta?.membership?.retro;
 
   if (
-    walletGroupsQuery.isLoading ||
+    walletGroupsQuery.isPending ||
     !selectedWallet ||
     !walletsMeta ||
     !eligibleWalletGroups ||
@@ -452,7 +452,7 @@ export function XpDropClaim() {
           <HCenter>
             {eligibleAddresses.length > 1 && !personalSignMutation.isSuccess ? (
               <ChangeWalletButton
-                disabled={personalSignMutation.isLoading}
+                disabled={personalSignMutation.isPending}
                 selectedWallet={selectedWallet}
                 onClick={() => walletSelectDialogRef.current?.showModal()}
               />
@@ -526,7 +526,7 @@ export function XpDropClaim() {
             buttonKind="primary"
             holdToSign={false}
           >
-            {personalSignMutation.isLoading ? (
+            {personalSignMutation.isPending ? (
               <HCenter>
                 <CircleSpinner />
               </HCenter>

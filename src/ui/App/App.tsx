@@ -105,7 +105,7 @@ const useAuthState = () => {
         wallet,
       };
     },
-    useErrorBoundary: true,
+    throwOnError: true,
     retry: false,
     refetchOnWindowFocus: false,
   });

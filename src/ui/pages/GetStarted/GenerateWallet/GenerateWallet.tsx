@@ -35,7 +35,7 @@ function GenerateWalletView() {
   const {
     mutate: generateMnemonicWallet,
     data,
-    isLoading,
+    isPending,
     status,
   } = useMutation({
     mutationFn: async () => {
@@ -43,7 +43,7 @@ function GenerateWalletView() {
       await new Promise((r) => setTimeout(r, 1000));
       return walletPort.request('uiGenerateMnemonic');
     },
-    useErrorBoundary: true,
+    throwOnError: true,
     onSuccess() {
       addStep(Step.done);
     },
@@ -112,12 +112,12 @@ function GenerateWalletView() {
       {data ? null : (
         <Button
           style={{ marginTop: 'auto' }}
-          disabled={isLoading}
+          disabled={isPending}
           onClick={() => {
             generateMnemonicWallet();
           }}
         >
-          {isLoading ? 'Generating...' : 'Generate new Wallet'}
+          {isPending ? 'Generating...' : 'Generate new Wallet'}
         </Button>
       )}
       {data ? (

@@ -35,7 +35,7 @@ function DisclosureButton({
   textKind: UITextKind;
   valueDetail: React.ReactNode | null;
 }) {
-  const { networks, isLoading } = useNetworks();
+  const { networks, isPending } = useNetworks();
   const { preferences } = usePreferences();
   const selectedNetwork =
     value === NetworkSelectValue.All
@@ -46,7 +46,7 @@ function DisclosureButton({
     chain: value,
     enabled:
       Boolean(preferences?.testnetMode?.on) &&
-      !isLoading &&
+      !isPending &&
       !selectedNetwork &&
       value !== NetworkSelectValue.All,
   });
@@ -119,7 +119,7 @@ export function NetworkBalance({
   dappChain: string | null;
   onChange(value: string | null): void;
 }) {
-  const { networks, isLoading } = useNetworks([dappChain].filter(isTruthy));
+  const { networks, isPending } = useNetworks([dappChain].filter(isTruthy));
   const [showWalletNameContent, setShowWalletNameContent] = useState(false);
   const { preferences } = usePreferences();
   const offsetValuesState = useStore(offsetValues);
@@ -160,7 +160,7 @@ export function NetworkBalance({
 
   const textKind = 'headline/h3';
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <UIText kind={textKind} style={{ width: '100%' }}>
         {NBSP}

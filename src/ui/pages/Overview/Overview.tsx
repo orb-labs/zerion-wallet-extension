@@ -144,7 +144,7 @@ function TestnetworkGuard({
 }>) {
   const { preferences } = usePreferences();
   const dappChain = dappChainStr ? createChain(dappChainStr) : null;
-  const { networks, isLoading } = useNetworks(
+  const { networks, isPending } = useNetworks(
     dappChainStr ? [dappChainStr] : undefined
   );
   const currentNetwork = dappChain
@@ -154,7 +154,7 @@ function TestnetworkGuard({
     chain: dappChainStr || null,
     enabled:
       Boolean(preferences?.testnetMode?.on) &&
-      !isLoading &&
+      !isPending &&
       !currentNetwork &&
       Boolean(dappChainStr),
   });
@@ -384,7 +384,7 @@ function OverviewComponent() {
     // setSearchParams is not a stable reference: https://github.com/remix-run/react-router/issues/9304
     setSearchParams(value ? [['chain', value]] : '');
   });
-  const { data, isLoading: isLoadingPortfolio } = useWalletPortfolio(
+  const { data, isPending: isLoadingPortfolio } = useWalletPortfolio(
     { addresses: [params.address], currency },
     { source: useHttpClientSource() },
     { enabled: ready, refetchInterval: 40000 }
@@ -404,15 +404,14 @@ function OverviewComponent() {
   const { data: tabData } = useQuery({
     queryKey: ['activeTab/origin'],
     queryFn: getActiveTabOrigin,
-    useErrorBoundary: true,
+    throwOnError: true,
   });
   const activeTabOrigin = tabData?.tabOrigin;
   const { data: siteChain } = useQuery({
     queryKey: ['requestChainForOrigin', activeTabOrigin],
     queryFn: () => requestChainForOrigin(activeTabOrigin),
     enabled: Boolean(activeTabOrigin),
-    useErrorBoundary: true,
-    suspense: false,
+    throwOnError: true,
   });
 
   const { data: loyaltyEnabled } = useRemoteConfigValue(

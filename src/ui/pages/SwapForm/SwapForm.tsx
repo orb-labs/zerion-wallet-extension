@@ -112,7 +112,6 @@ function useTxEligibility(
   const source = preferences?.testnetMode?.on ? 'testnet' : 'mainnet';
   const enabled = !tx ? false : enabledParam;
   return useQuery({
-    suspense: false,
     queryKey: ['adjustedCheckEligibility', tx, source],
     queryFn: async () => {
       if (!tx) {
@@ -169,7 +168,7 @@ export function SwapFormComponent() {
   const { data: wallet } = useQuery({
     queryKey: ['wallet/uiGetCurrentWallet'],
     queryFn: () => walletPort.request('uiGetCurrentWallet'),
-    useErrorBoundary: true,
+    throwOnError: true,
   });
 
   const { data: positionsResponse } = useHttpAddressPositions(
@@ -302,7 +301,7 @@ export function SwapFormComponent() {
     spender: quote?.token_spender ?? null,
     contractAddress,
     enabled: quotesData.done && Boolean(quote && !quote.enough_allowance),
-    keepPreviousData: false,
+    shouldKeepPlaceholderData: false,
   });
 
   const sendTxBtnRef = useRef<SendTxBtnHandle | null>(null);
@@ -314,7 +313,6 @@ export function SwapFormComponent() {
       : swapTransaction;
 
   const { data: networkNonce, refetch: refetchNonce } = useQuery({
-    suspense: false,
     queryKey: ['uiGetBestKnownTransactionCount', address, chain, networks],
     queryFn: async () => {
       if (!chain || !networks) {
@@ -443,7 +441,7 @@ export function SwapFormComponent() {
   const {
     mutate: sendTransaction,
     data: transactionHash,
-    isLoading,
+    isPending,
     reset,
     isSuccess,
     ...sendTransactionMutation
@@ -497,7 +495,7 @@ export function SwapFormComponent() {
   });
 
   const resetMutationIfNotLoading = useEvent(() => {
-    if (!isLoading) {
+    if (!isPending) {
       reset();
     }
   });
@@ -568,7 +566,7 @@ export function SwapFormComponent() {
   }
 
   const isApproveMode =
-    approveMutation.isLoading ||
+    approveMutation.isPending ||
     (quotesData.done && !enough_allowance) ||
     approveTxStatus === 'pending';
   const showApproveHintLine =
@@ -836,7 +834,7 @@ export function SwapFormComponent() {
         <AnimatedAppear display={showApproveHintLine}>
           <HStack gap={12} alignItems="center">
             <ApproveHintLine approved={enough_allowance} actionName="Swap" />
-            {approveMutation.isLoading || approveTxStatus === 'pending' ? (
+            {approveMutation.isPending || approveTxStatus === 'pending' ? (
               <CircleSpinner />
             ) : null}
           </HStack>
@@ -876,7 +874,7 @@ export function SwapFormComponent() {
                   wallet={wallet}
                   disabled={
                     approvalTransactionIsFetching ||
-                    approveMutation.isLoading ||
+                    approveMutation.isPending ||
                     approveTxStatus === 'pending'
                   }
                   holdToSign={false}
@@ -911,7 +909,7 @@ export function SwapFormComponent() {
                       wallet={wallet}
                       style={{ marginTop: 'auto' }}
                       disabled={
-                        isLoading ||
+                        isPending ||
                         quotesData.isLoading ||
                         Boolean((quote && !swapTransaction) || quotesData.error)
                       }
@@ -928,7 +926,7 @@ export function SwapFormComponent() {
                         {hint ||
                           (quotesData.isLoading
                             ? 'Fetching offers'
-                            : isLoading
+                            : isPending
                             ? 'Sending...'
                             : 'Swap')}
                       </span>

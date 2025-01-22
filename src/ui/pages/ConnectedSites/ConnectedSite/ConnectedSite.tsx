@@ -61,7 +61,7 @@ function RevokeAllButton({
         }}
       >
         <UIText kind="body/accent">
-          {removePermissionMutation.isLoading ? 'Loading...' : 'Disconnect All'}
+          {removePermissionMutation.isPending ? 'Loading...' : 'Disconnect All'}
         </UIText>
       </Button>
     </>
@@ -119,7 +119,7 @@ export function ConnectedSite() {
   const { data: connectedSites, refetch } = useQuery({
     queryKey: ['getPermissionsWithWallets'],
     queryFn: getPermissionsWithWallets,
-    useErrorBoundary: true,
+    throwOnError: true,
   });
   const connectedSite = useMemo(
     () => getConnectedSite(originName, connectedSites),

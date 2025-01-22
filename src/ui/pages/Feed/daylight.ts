@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import ky from 'ky';
 import type { InfiniteData } from '@tanstack/react-query';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, keepPreviousData } from '@tanstack/react-query';
 import type {
   WalletAbility,
   WalletAbilityType,
@@ -73,8 +73,7 @@ export function useWalletAbilities({
       lastPage.links.next ? { link: lastPage.links.next } : undefined,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
-    suspense: false,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
     onSuccess,
   });
 

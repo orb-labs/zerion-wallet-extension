@@ -1,5 +1,10 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { hashQueryKey, useMutation, useQuery } from '@tanstack/react-query';
+import {
+  hashKey,
+  useMutation,
+  useQuery,
+  keepPreviousData,
+} from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Client, type AddressAction } from 'defi-sdk';
 import type { CustomConfiguration } from '@zeriontech/transactions';
@@ -214,8 +219,7 @@ function usePreparedTx(transaction: IncomingTransaction, origin: string) {
     queryFn: async () =>
       withChainId ? resolveGasAndFee(withChainId, { source }) : null,
     enabled: Boolean(withChainId),
-    useErrorBoundary: true,
-    suspense: false,
+    throwOnError: true,
   });
   return {
     /** popuLATERtrasaction - it's partially populated now and will get more data later :D */
@@ -248,7 +252,7 @@ function useLocalAddressAction({
     ],
     queryKeyHashFn: (queryKey) => {
       const key = queryKey.map((x) => (x instanceof Client ? x.url : x));
-      return hashQueryKey(key);
+      return hashKey(key);
     },
     queryFn: () => {
       return incomingTxToIncomingAddressAction(
@@ -259,8 +263,8 @@ function useLocalAddressAction({
         client
       );
     },
-    keepPreviousData: true,
-    useErrorBoundary: true,
+    placeholderData: keepPreviousData,
+    throwOnError: true,
     retry: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
@@ -293,7 +297,7 @@ function useInterpretTransaction({
     ],
     queryKeyHashFn: (queryKey) => {
       const key = queryKey.map((x) => (x instanceof Client ? x.url : x));
-      return hashQueryKey(key);
+      return hashKey(key);
     },
     queryFn: () =>
       interpretTransaction({
@@ -304,9 +308,8 @@ function useInterpretTransaction({
         currency,
       }),
     enabled,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
     staleTime: 20000,
-    suspense: false,
     retry: 1,
   });
 }
@@ -577,7 +580,6 @@ function SendTransactionContent({
     // transaction gas type may change when gasPrices responds, so we should wait
     // to avoid inconsistency between paymasterCheckEligibility and getPaymasterParams calls
     enabled: paymasterPossible && gasPricesQuery.isFetched,
-    suspense: false,
     staleTime: 120000,
     queryKey: ['paymaster/check-eligibility', populatedTransaction, source],
     queryFn: async () => {
@@ -600,10 +602,10 @@ function SendTransactionContent({
   });
 
   const paymasterEligible = Boolean(eligibilityQuery.data?.data?.eligible);
-  const { isStale } = useStaleTime(eligibilityQuery.isLoading, 2000);
+  const { isStale } = useStaleTime(eligibilityQuery.isPending, 2000);
   /** avoid a flash between network fee and "free" label, but not wait too long */
   const paymasterWaiting =
-    paymasterPossible && eligibilityQuery.isLoading && !isStale;
+    paymasterPossible && eligibilityQuery.isPending && !isStale;
 
   const client = useDefiSdkClient();
 
@@ -622,8 +624,7 @@ function SendTransactionContent({
     // Both paymasterTxInterpretQuery and txInterpret query must behave the same
     // and keepPreviousData. Failing to do this currently may break AllowanceView
     // component because we will pass a nullish requestedAllowanceQuantityBase during refetch
-    keepPreviousData: true,
-    suspense: false,
+    placeholderData: keepPreviousData,
     queryKey: [
       'interpret/typedData',
       populatedTransaction,
@@ -640,7 +641,7 @@ function SendTransactionContent({
     ],
     queryKeyHashFn: (queryKey) => {
       const key = queryKey.map((x) => (x instanceof Client ? x.url : x));
-      return hashQueryKey(key);
+      return hashKey(key);
     },
     queryFn: async () => {
       const configuredTx = await configureTransactionToSign(
@@ -860,8 +861,8 @@ function SendTransactionContent({
                   wallet={wallet}
                   ref={sendTxBtnRef}
                   onClick={() => sendTransaction()}
-                  isLoading={sendTransactionMutation.isLoading}
-                  disabled={sendTransactionMutation.isLoading}
+                  isLoading={sendTransactionMutation.isPending}
+                  disabled={sendTransactionMutation.isPending}
                   buttonKind={
                     interpretationHasCriticalWarning ? 'danger' : 'primary'
                   }
@@ -887,7 +888,7 @@ export function SendTransaction() {
   const { data: wallet, isLoading } = useQuery({
     queryKey: ['wallet/uiGetCurrentWallet'],
     queryFn: () => walletPort.request('uiGetCurrentWallet'),
-    useErrorBoundary: true,
+    throwOnError: true,
   });
   const transactionStringified = params.get('transaction');
   invariant(

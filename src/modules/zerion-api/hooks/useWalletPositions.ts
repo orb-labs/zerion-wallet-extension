@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { persistentQuery } from 'src/ui/shared/requests/queryClientPersistence';
 import { ZerionAPI } from '../zerion-api.client';
 import {
@@ -17,14 +17,12 @@ export function useHttpAddressPositions(
   params: WalletGetPositionsParams,
   { source }: BackendSourceParams,
   {
-    suspense = false,
     enabled = true,
-    keepPreviousData = false,
+    shouldKeepPreviousData = false,
     refetchInterval,
   }: {
-    suspense?: boolean;
     enabled?: boolean;
-    keepPreviousData?: boolean;
+    shouldKeepPreviousData?: boolean;
     refetchInterval?: number | false;
   } = {}
 ) {
@@ -36,9 +34,8 @@ export function useHttpAddressPositions(
       });
       return toAddressPositions(response);
     },
-    suspense,
     enabled,
-    keepPreviousData,
+    placeholderData: shouldKeepPreviousData ? keepPreviousData : undefined,
     staleTime: 20000,
     refetchInterval,
   });

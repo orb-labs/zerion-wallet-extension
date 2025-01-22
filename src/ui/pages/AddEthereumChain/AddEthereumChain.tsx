@@ -66,12 +66,11 @@ function AddOrUpdateChain({
   const chainId = normalizeChainId(addEthereumChainParameter.chainId);
   const { networks, loadNetworkByChainId } = useNetworks();
 
-  const { data: updatedNetworks, isLoading } = useQuery({
+  const { data: updatedNetworks, isPending } = useQuery({
     queryKey: ['loadNetworkByChainId', chainId],
     queryFn: () => loadNetworkByChainId(chainId),
     enabled: Boolean(chainId),
-    useErrorBoundary: false,
-    suspense: false,
+    throwOnError: false,
   });
 
   const { network, prevNetwork } = useMemo(() => {
@@ -123,7 +122,7 @@ function AddOrUpdateChain({
       : null;
   }, [networks]);
 
-  if (!restrictedChainIds || isLoading) {
+  if (!restrictedChainIds || isPending) {
     return <ViewLoading kind="network" />;
   }
 
@@ -164,7 +163,7 @@ function AddOrUpdateChain({
             network={network}
             prevNetwork={prevNetwork}
             rpcUrlHelpHref={`/addEthereumChain/what-is-rpc-url?${params}`}
-            isSubmitting={addEthereumChainMutation.isLoading}
+            isSubmitting={addEthereumChainMutation.isPending}
             onKeepCurrent={onKeepCurrent}
             onSubmit={(networkId, result) => {
               addEthereumChainMutation.mutate({
@@ -178,7 +177,7 @@ function AddOrUpdateChain({
             chain={network.id}
             chainConfig={addEthereumChainParameter}
             submitText="Add"
-            isSubmitting={addEthereumChainMutation.isLoading}
+            isSubmitting={addEthereumChainMutation.isPending}
             onCancel={onReject}
             onSubmit={(networkId, result) => {
               addEthereumChainMutation.mutate({
@@ -194,7 +193,7 @@ function AddOrUpdateChain({
         <PageBottom />
       </PageColumn>
       <PageStickyFooter>
-        {isLoading ? (
+        {isPending ? (
           <DelayedRender delay={500}>
             <Spacer height={8} />
             <UIText

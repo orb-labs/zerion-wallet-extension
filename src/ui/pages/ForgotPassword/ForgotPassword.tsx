@@ -35,7 +35,7 @@ export function ForgotPassword() {
   if (eraseAllData.isSuccess) {
     return null; // avoid flickering while waiting for navigation
   }
-  if (eraseAllData.isLoading) {
+  if (eraseAllData.isPending) {
     return <EraseDataInProgress />;
   }
   return (
@@ -75,7 +75,7 @@ export function ForgotPassword() {
             <UnstyledButton
               style={{ width: '100%' }}
               className={helperStyles.hoverUnderline}
-              disabled={eraseAllData.isLoading}
+              disabled={eraseAllData.isPending}
               onClick={() => {
                 invariant(dialogRef.current, 'dialog element must be mounted');
                 showConfirmDialog(dialogRef.current).then(() => {

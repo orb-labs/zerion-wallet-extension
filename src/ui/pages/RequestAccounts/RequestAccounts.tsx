@@ -92,8 +92,7 @@ function useRedirectIfOriginAlreadyAllowed({
     queryKey: ['getOriginPermissions'],
     queryFn: () => walletPort.request('getOriginPermissions'),
     enabled: Boolean(address),
-    useErrorBoundary: true,
-    suspense: true,
+    throwOnError: true,
     refetchOnWindowFocus: false,
     retry: false,
     onSuccess(result) {
@@ -271,7 +270,7 @@ export function RequestAccounts() {
   const walletGroupsQuery = useQuery({
     queryKey: ['wallet/uiGetWalletGroups'],
     queryFn: () => walletPort.request('uiGetWalletGroups'),
-    useErrorBoundary: true,
+    throwOnError: true,
   });
   const {
     data: wallet,
@@ -305,7 +304,7 @@ export function RequestAccounts() {
   if (isError) {
     return <p>Some Error</p>;
   }
-  if (isLoading || !wallet || walletGroupsQuery.isLoading) {
+  if (isLoading || !wallet || walletGroupsQuery.isPending) {
     return null;
   }
   return (

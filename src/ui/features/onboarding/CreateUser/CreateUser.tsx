@@ -29,7 +29,7 @@ export function CreateUser() {
   const navigate = useNavigate();
   const goBack = useGoBack();
 
-  const { mutate: handleSubmit, isLoading } = useMutation({
+  const { mutate: handleSubmit, isPending } = useMutation({
     mutationFn: async ({ password }: { password: string | null }) => {
       await wait(2000);
       if (password) {
@@ -60,7 +60,7 @@ export function CreateUser() {
   return (
     <VStack gap={isNarrowView ? 16 : 56}>
       <div className={helperStyles.container}>
-        {isLoading ? (
+        {isPending ? (
           <div className={helperStyles.loadingOverlay}>
             <UIText kind="headline/hero" className={helperStyles.loadingTitle}>
               Creating Wallet

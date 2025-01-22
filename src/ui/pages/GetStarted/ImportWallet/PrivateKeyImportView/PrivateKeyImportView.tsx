@@ -122,7 +122,7 @@ export function PrivateKeyImportView({
       <PrivateKeyImportFlow
         address={data?.address ?? null}
         errorMessage={importError?.message ?? null}
-        isPreparing={importWallet.isLoading}
+        isPreparing={importWallet.isPending}
         onSubmit={() => navigate('/overview')}
       />
       <PageBottom />

@@ -55,7 +55,7 @@ export function useWalletNameFlags(tabOrigin?: string) {
 
   return {
     walletNameFlags,
-    isLoading: query.isLoading,
+    isLoading: query.isPending,
     setWalletNameFlags,
     isMetaMask,
   };

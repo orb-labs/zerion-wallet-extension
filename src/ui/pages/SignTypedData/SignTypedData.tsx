@@ -451,8 +451,7 @@ function SignTypedDataContent({
   const { data: chain } = useQuery({
     queryKey: ['requestChainForOrigin', origin],
     queryFn: () => requestChainForOrigin(origin),
-    useErrorBoundary: true,
-    suspense: true,
+    throwOnError: true,
   });
 
   const { networks } = useNetworks(chain ? [chain.toString()] : undefined);
@@ -477,7 +476,6 @@ function SignTypedDataContent({
           })
         : null,
     enabled: Boolean(chainId && network?.supports_simulations),
-    suspense: false,
     retry: 1,
     refetchOnMount: false,
     refetchOnReconnect: false,
@@ -562,7 +560,7 @@ export function SignTypedData() {
   const { data: wallet, isLoading } = useQuery({
     queryKey: ['wallet/uiGetCurrentWallet'],
     queryFn: () => walletPort.request('uiGetCurrentWallet'),
-    useErrorBoundary: true,
+    throwOnError: true,
   });
   if (isLoading || !wallet) {
     return null;

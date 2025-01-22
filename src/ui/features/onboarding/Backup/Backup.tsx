@@ -32,7 +32,7 @@ export function Backup() {
     mutationFn: () => ensurePendingWalletAndUser(),
     onSuccess: () => navigate('/onboarding/success'),
     onError: handleError,
-    useErrorBoundary: true,
+    throwOnError: true,
   });
 
   const { mutate: handleSuccess } = useMutation({
@@ -44,7 +44,7 @@ export function Backup() {
     },
     onSuccess: () => navigate('/onboarding/success'),
     onError: handleError,
-    useErrorBoundary: true,
+    throwOnError: true,
   });
 
   const handleSessionExpired = useCallback(

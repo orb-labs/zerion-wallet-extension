@@ -152,8 +152,7 @@ export function NonceLine({
         defaultBlock: 'pending',
       });
     },
-    useErrorBoundary: false,
-    suspense: true,
+    throwOnError: false,
   });
   const dialogRef = useRef<HTMLDialogElementInterface | null>(null);
   const nonce = data?.value;

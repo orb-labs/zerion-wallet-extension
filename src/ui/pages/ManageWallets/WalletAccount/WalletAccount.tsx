@@ -89,7 +89,7 @@ function EditableWalletName({
             setValue(name);
           }}
         />
-        {renameMutation.isLoading ? (
+        {renameMutation.isPending ? (
           <CircleSpinner style={{ display: 'inline-block' }} />
         ) : null}
       </div>
@@ -183,9 +183,9 @@ export function WalletAccount() {
     queryKey: ['wallet/uiGetWalletByAddress', address, groupId],
     queryFn: () =>
       walletPort.request('uiGetWalletByAddress', { address, groupId }),
-    useErrorBoundary: true,
+    throwOnError: true,
   });
-  const { data: walletGroup, isLoading: walletGroupIsLoading } = useQuery({
+  const { data: walletGroup, isPending: walletGroupIsLoading } = useQuery({
     queryKey: ['getWalletGroupByAddress', address],
     queryFn: () => getWalletGroupByAddress(address),
   });
@@ -193,7 +193,7 @@ export function WalletAccount() {
   const { value: displayName } = useProfileName({ address, name: walletName });
   const removeAddressMutation = useMutation({
     mutationFn: () => walletPort.request('removeAddress', { address, groupId }),
-    useErrorBoundary: false,
+    throwOnError: false,
     onSuccess() {
       refetchWallet();
       navigate(-1);
