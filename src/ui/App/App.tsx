@@ -23,6 +23,23 @@ import { SignTypedData } from 'src/ui/pages/SignTypedData';
 import { useStore } from '@store-unit/react';
 import { runtimeStore } from 'src/shared/core/runtime-store';
 import { useDefiSdkClient } from 'src/modules/defi-sdk/useDefiSdkClient';
+import { OrbyProvider } from '@orb-labs/orby-react';
+import {
+  Account,
+  AccountCluster,
+  AccountType,
+  BlockchainEnvironment,
+  Category,
+  OnchainOperation,
+  OperationDataFormat,
+  OperationStatus,
+  OperationStatusType,
+  OperationType,
+  SignedOperation,
+  VMType,
+} from '@orb-labs/orby-core';
+import { WagmiProvider, createConfig, http } from 'wagmi';
+import { mainnet, base, optimism, arbitrum, polygon } from 'wagmi/chains';
 import { Login } from '../pages/Login';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import {
@@ -84,6 +101,18 @@ import { XpDrop } from '../features/xp-drop';
 import { RouteRestoration, registerPersistentRoute } from './RouteRestoration';
 
 const isProd = process.env.NODE_ENV === 'production';
+
+const wagmiConfig = createConfig({
+  chains: [mainnet, base, polygon, optimism, arbitrum],
+  multiInjectedProviderDiscovery: false,
+  transports: {
+    [mainnet.id]: http(),
+    [base.id]: http(),
+    [optimism.id]: http(),
+    [arbitrum.id]: http(),
+    [polygon.id]: http(),
+  },
+});
 
 function DefiSdkClientProvider({ children }: React.PropsWithChildren) {
   const client = useDefiSdkClient();
@@ -462,7 +491,7 @@ export interface AppProps {
   inspect?: { message: string };
 }
 
-export function App({ initialView, inspect }: AppProps) {
+function InnerApp({ initialView, inspect }: AppProps) {
   const isOnboardingMode = urlContext.appMode === 'onboarding';
   const isPageLayout = urlContext.windowLayout === 'page';
 
@@ -495,57 +524,79 @@ export function App({ initialView, inspect }: AppProps) {
   const isOnboardingView =
     isOnboardingMode && initialView !== 'handshakeFailure';
 
+  const orbyConfig = useMemo(
+    () => ({
+      instancePrivateAPIKey: process.env.ORBY_PRIVATE_API_KEY as string,
+      instancePublicAPIKey: process.env.ORBY_PUBLIC_API_KEY as string,
+      appName: 'Zerion Wallet',
+      environment: BlockchainEnvironment.MAINNET,
+    }),
+    []
+  );
+
   return (
-    <AreaProvider>
-      <UIContext.Provider value={defaultUIContextValue}>
-        <QueryClientProvider client={queryClient}>
-          <DesignTheme bodyClassList={bodyClassList} />
-          <Router>
-            <ErrorBoundary renderError={(error) => <ViewError error={error} />}>
-              <InactivityDetector />
-              <SessionResetHandler />
-              <ProgrammaticNavigationHelper />
-              <ThemeDecoration />
-              {inspect && !isProd ? (
-                <UIText
-                  kind="small/regular"
-                  style={{
-                    borderBottom: '1px solid var(--neutral-300)',
-                    paddingInline: 12,
-                  }}
-                >
-                  {inspect.message}
-                </UIText>
-              ) : null}
-              <GlobalKeyboardShortcuts />
-              <VersionUpgrade>
-                {!isOnboardingView && !isPageLayout ? (
-                  // Render above <ViewSuspense /> so that it doesn't flicker
-                  <MaybeTestModeDecoration />
+    <OrbyProvider config={orbyConfig}>
+      <AreaProvider>
+        <UIContext.Provider value={defaultUIContextValue}>
+          <QueryClientProvider client={queryClient}>
+            <DesignTheme bodyClassList={bodyClassList} />
+            <Router>
+              <ErrorBoundary
+                renderError={(error) => <ViewError error={error} />}
+              >
+                <InactivityDetector />
+                <SessionResetHandler />
+                <ProgrammaticNavigationHelper />
+                <ThemeDecoration />
+                {inspect && !isProd ? (
+                  <UIText
+                    kind="small/regular"
+                    style={{
+                      borderBottom: '1px solid var(--neutral-300)',
+                      paddingInline: 12,
+                    }}
+                  >
+                    {inspect.message}
+                  </UIText>
                 ) : null}
-                <ViewSuspense logDelays={true}>
-                  {isOnboardingView ? (
-                    <Onboarding />
-                  ) : isPageLayout ? (
-                    <PageLayoutViews />
-                  ) : (
-                    <DefiSdkClientProvider>
-                      <Views
-                        initialRoute={
-                          initialView === 'handshakeFailure'
-                            ? '/handshake-failure'
-                            : undefined
-                        }
-                      />
-                    </DefiSdkClientProvider>
-                  )}
-                </ViewSuspense>
-              </VersionUpgrade>
-            </ErrorBoundary>
-            <FooterBugReportButton />
-          </Router>
-        </QueryClientProvider>
-      </UIContext.Provider>
-    </AreaProvider>
+                <GlobalKeyboardShortcuts />
+                <VersionUpgrade>
+                  {!isOnboardingView && !isPageLayout ? (
+                    // Render above <ViewSuspense /> so that it doesn't flicker
+                    <MaybeTestModeDecoration />
+                  ) : null}
+                  <ViewSuspense logDelays={true}>
+                    {isOnboardingView ? (
+                      <Onboarding />
+                    ) : isPageLayout ? (
+                      <PageLayoutViews />
+                    ) : (
+                      <DefiSdkClientProvider>
+                        <Views
+                          initialRoute={
+                            initialView === 'handshakeFailure'
+                              ? '/handshake-failure'
+                              : undefined
+                          }
+                        />
+                      </DefiSdkClientProvider>
+                    )}
+                  </ViewSuspense>
+                </VersionUpgrade>
+              </ErrorBoundary>
+              <FooterBugReportButton />
+            </Router>
+          </QueryClientProvider>
+        </UIContext.Provider>
+      </AreaProvider>
+    </OrbyProvider>
+  );
+}
+
+export default function App({ initialView, inspect }: AppProps) {
+  return (
+    <WagmiProvider config={wagmiConfig}>
+      <InnerApp initialView={initialView} inspect={inspect} />
+    </WagmiProvider>
   );
 }
