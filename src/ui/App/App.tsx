@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { AreaProvider } from 'react-area';
 import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import {
@@ -23,23 +23,19 @@ import { SignTypedData } from 'src/ui/pages/SignTypedData';
 import { useStore } from '@store-unit/react';
 import { runtimeStore } from 'src/shared/core/runtime-store';
 import { useDefiSdkClient } from 'src/modules/defi-sdk/useDefiSdkClient';
-import { OrbyProvider } from '@orb-labs/orby-react';
+import { OrbyProvider, useOrby } from '@orb-labs/orby-react';
+import { bulkResetConnectedAppSessions } from '@orb-labs/orby-core-mini';
 import {
   Account,
-  AccountCluster,
   AccountType,
   BlockchainEnvironment,
-  Category,
-  OnchainOperation,
-  OperationDataFormat,
-  OperationStatus,
-  OperationStatusType,
-  OperationType,
-  SignedOperation,
   VMType,
 } from '@orb-labs/orby-core';
 import { WagmiProvider, createConfig, http } from 'wagmi';
 import { mainnet, base, optimism, arbitrum, polygon } from 'wagmi/chains';
+import { getPermissionsWithWallets } from 'src/ui/shared/requests/getPermissionsWithWallets';
+import type { ConnectedSiteItem } from 'src/ui/shared/requests/getPermissionsWithWallets';
+import { getOrCreateAccountCluster } from 'src/ui/shared/orby';
 import { Login } from '../pages/Login';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import {
@@ -492,6 +488,48 @@ export interface AppProps {
 }
 
 function InnerApp({ initialView, inspect }: AppProps) {
+  const { baseMainnetClient } = useOrby();
+
+  const { data: allConnectedSites, isPending } = useQuery({
+    queryKey: ['getPermissionsWithWallets'],
+    queryFn: getPermissionsWithWallets,
+    throwOnError: true,
+  });
+
+  useEffect(() => {
+    async function updateAppSessions(allConnectedSites: ConnectedSiteItem[]) {
+      const promises = allConnectedSites.map(
+        async ({ origin, addresses }: ConnectedSiteItem) => {
+          // NOTE: We are assuming one address per site
+          const address = addresses[0];
+
+          const account = new Account(
+            address?.toLowerCase(),
+            AccountType.EOA,
+            VMType.EVM,
+            undefined
+          );
+
+          const accountCluster = await getOrCreateAccountCluster(
+            baseMainnetClient,
+            [account]
+          );
+
+          return {
+            appUrl: origin,
+            activeAccountClusterId: accountCluster?.accountClusterId,
+          };
+        }
+      );
+      const sessions = await Promise.all(promises);
+      bulkResetConnectedAppSessions(sessions);
+    }
+
+    if (allConnectedSites?.length && !isPending && baseMainnetClient) {
+      updateAppSessions(allConnectedSites);
+    }
+  }, [allConnectedSites, isPending, baseMainnetClient]);
+
   const isOnboardingMode = urlContext.appMode === 'onboarding';
   const isPageLayout = urlContext.windowLayout === 'page';
 
@@ -524,79 +562,74 @@ function InnerApp({ initialView, inspect }: AppProps) {
   const isOnboardingView =
     isOnboardingMode && initialView !== 'handshakeFailure';
 
-  const orbyConfig = useMemo(
-    () => ({
-      instancePrivateAPIKey: process.env.ORBY_PRIVATE_API_KEY as string,
-      instancePublicAPIKey: process.env.ORBY_PUBLIC_API_KEY as string,
-      appName: 'Zerion Wallet',
-      environment: BlockchainEnvironment.MAINNET,
-    }),
-    []
-  );
-
   return (
-    <OrbyProvider config={orbyConfig}>
-      <AreaProvider>
-        <UIContext.Provider value={defaultUIContextValue}>
-          <QueryClientProvider client={queryClient}>
-            <DesignTheme bodyClassList={bodyClassList} />
-            <Router>
-              <ErrorBoundary
-                renderError={(error) => <ViewError error={error} />}
+    <AreaProvider>
+      <UIContext.Provider value={defaultUIContextValue}>
+        <DesignTheme bodyClassList={bodyClassList} />
+        <Router>
+          <ErrorBoundary renderError={(error) => <ViewError error={error} />}>
+            <InactivityDetector />
+            <SessionResetHandler />
+            <ProgrammaticNavigationHelper />
+            <ThemeDecoration />
+            {inspect && !isProd ? (
+              <UIText
+                kind="small/regular"
+                style={{
+                  borderBottom: '1px solid var(--neutral-300)',
+                  paddingInline: 12,
+                }}
               >
-                <InactivityDetector />
-                <SessionResetHandler />
-                <ProgrammaticNavigationHelper />
-                <ThemeDecoration />
-                {inspect && !isProd ? (
-                  <UIText
-                    kind="small/regular"
-                    style={{
-                      borderBottom: '1px solid var(--neutral-300)',
-                      paddingInline: 12,
-                    }}
-                  >
-                    {inspect.message}
-                  </UIText>
-                ) : null}
-                <GlobalKeyboardShortcuts />
-                <VersionUpgrade>
-                  {!isOnboardingView && !isPageLayout ? (
-                    // Render above <ViewSuspense /> so that it doesn't flicker
-                    <MaybeTestModeDecoration />
-                  ) : null}
-                  <ViewSuspense logDelays={true}>
-                    {isOnboardingView ? (
-                      <Onboarding />
-                    ) : isPageLayout ? (
-                      <PageLayoutViews />
-                    ) : (
-                      <DefiSdkClientProvider>
-                        <Views
-                          initialRoute={
-                            initialView === 'handshakeFailure'
-                              ? '/handshake-failure'
-                              : undefined
-                          }
-                        />
-                      </DefiSdkClientProvider>
-                    )}
-                  </ViewSuspense>
-                </VersionUpgrade>
-              </ErrorBoundary>
-              <FooterBugReportButton />
-            </Router>
-          </QueryClientProvider>
-        </UIContext.Provider>
-      </AreaProvider>
-    </OrbyProvider>
+                {inspect.message}
+              </UIText>
+            ) : null}
+            <GlobalKeyboardShortcuts />
+            <VersionUpgrade>
+              {!isOnboardingView && !isPageLayout ? (
+                // Render above <ViewSuspense /> so that it doesn't flicker
+                <MaybeTestModeDecoration />
+              ) : null}
+              <ViewSuspense logDelays={true}>
+                {isOnboardingView ? (
+                  <Onboarding />
+                ) : isPageLayout ? (
+                  <PageLayoutViews />
+                ) : (
+                  <DefiSdkClientProvider>
+                    <Views
+                      initialRoute={
+                        initialView === 'handshakeFailure'
+                          ? '/handshake-failure'
+                          : undefined
+                      }
+                    />
+                  </DefiSdkClientProvider>
+                )}
+              </ViewSuspense>
+            </VersionUpgrade>
+          </ErrorBoundary>
+          <FooterBugReportButton />
+        </Router>
+      </UIContext.Provider>
+    </AreaProvider>
   );
 }
 
-export default function App({ initialView, inspect }: AppProps) {
+const orbyConfig = {
+  instancePrivateAPIKey: process.env.ORBY_PRIVATE_API_KEY as string,
+  instancePublicAPIKey: process.env.ORBY_PUBLIC_API_KEY as string,
+  appName: 'Zerion Wallet',
+  environment: BlockchainEnvironment.MAINNET,
+};
+
+export function App({ initialView, inspect }: AppProps) {
   return (
-    <WagmiProvider config={wagmiConfig}>
-      <InnerApp initialView={initialView} inspect={inspect} />
-    </WagmiProvider>
+    <QueryClientProvider client={queryClient}>
+      <WagmiProvider config={wagmiConfig}>
+        <OrbyProvider config={orbyConfig}>
+          <InnerApp initialView={initialView} inspect={inspect} />
+        </OrbyProvider>
+      </WagmiProvider>
+    </QueryClientProvider>
   );
 }
