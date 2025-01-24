@@ -1,9 +1,8 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { updateConnectedAppSession } from '@orb-labs/orby-core-mini';
 import { Account, AccountType, VMType } from '@orb-labs/orby-core';
-import { useOrby } from '@orb-labs/orby-react';
+import { connectAppSession, useOrby } from '@orb-labs/orby-react';
 import { PageColumn } from 'src/ui/components/PageColumn';
 import { walletPort, windowPort } from 'src/ui/shared/channels';
 import { Spacer } from 'src/ui/ui-kit/Spacer';
@@ -36,8 +35,6 @@ import { NavigationTitle } from 'src/ui/components/NavigationTitle';
 import type { WalletGroup } from 'src/shared/types/WalletGroup';
 import type { BareWallet } from 'src/shared/types/BareWallet';
 import type { DeviceAccount } from 'src/shared/types/Device';
-import { useAddressParams } from 'src/ui/shared/user-address/useAddressParams';
-import { getOrCreateAccountCluster } from 'src/ui/shared/orby';
 import { ZStack } from 'src/ui/ui-kit/ZStack';
 import { WalletList } from '../WalletSelect/WalletList';
 
@@ -291,8 +288,6 @@ export function RequestAccounts() {
 
   const handleConfirm = useCallback(
     async (result: { address: string; origin: string }) => {
-      windowPort.confirm(windowId, result);
-
       const account = new Account(
         result.address,
         AccountType.EOA,
@@ -300,14 +295,15 @@ export function RequestAccounts() {
         undefined
       );
 
-      const accountCluster = await getOrCreateAccountCluster(
-        baseMainnetClient,
-        [account]
+      const haha = await connectAppSession(
+        [account],
+        result.origin || '',
+        baseMainnetClient
       );
-      updateConnectedAppSession({
-        appUrl: result.origin,
-        activeAccountClusterId: accountCluster?.accountClusterId,
-      });
+
+      console.log('connectAppSession', haha);
+
+      windowPort.confirm(windowId, result);
     },
     [windowId, baseMainnetClient]
   );

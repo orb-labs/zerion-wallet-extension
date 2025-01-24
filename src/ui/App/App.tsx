@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { AreaProvider } from 'react-area';
 import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import {
@@ -23,19 +23,11 @@ import { SignTypedData } from 'src/ui/pages/SignTypedData';
 import { useStore } from '@store-unit/react';
 import { runtimeStore } from 'src/shared/core/runtime-store';
 import { useDefiSdkClient } from 'src/modules/defi-sdk/useDefiSdkClient';
-import { OrbyProvider, useOrby } from '@orb-labs/orby-react';
-import { bulkResetConnectedAppSessions } from '@orb-labs/orby-core-mini';
-import {
-  Account,
-  AccountType,
-  BlockchainEnvironment,
-  VMType,
-} from '@orb-labs/orby-core';
-import { WagmiProvider, createConfig, http } from 'wagmi';
-import { mainnet, base, optimism, arbitrum, polygon } from 'wagmi/chains';
+import { OrbyProvider } from '@orb-labs/orby-react';
+import { Account, AccountType, VMType } from '@orb-labs/orby-core';
+import { useBulkConnectAppSessions } from '@orb-labs/orby-react';
 import { getPermissionsWithWallets } from 'src/ui/shared/requests/getPermissionsWithWallets';
 import type { ConnectedSiteItem } from 'src/ui/shared/requests/getPermissionsWithWallets';
-import { getOrCreateAccountCluster } from 'src/ui/shared/orby';
 import { Login } from '../pages/Login';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import {
@@ -98,18 +90,6 @@ import { RouteRestoration, registerPersistentRoute } from './RouteRestoration';
 
 const isProd = process.env.NODE_ENV === 'production';
 
-const wagmiConfig = createConfig({
-  chains: [mainnet, base, polygon, optimism, arbitrum],
-  multiInjectedProviderDiscovery: false,
-  transports: {
-    [mainnet.id]: http(),
-    [base.id]: http(),
-    [optimism.id]: http(),
-    [arbitrum.id]: http(),
-    [polygon.id]: http(),
-  },
-});
-
 function DefiSdkClientProvider({ children }: React.PropsWithChildren) {
   const client = useDefiSdkClient();
   return <DefiSdkClientContextProvider client={client} children={children} />;
@@ -130,7 +110,7 @@ const useAuthState = () => {
         wallet,
       };
     },
-    throwOnError: true,
+    // useErrorBoundary: true,
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -487,87 +467,71 @@ export interface AppProps {
   inspect?: { message: string };
 }
 
-function InnerApp({ initialView, inspect }: AppProps) {
-  const { baseMainnetClient } = useOrby();
-
+export function RegisterSessions() {
+  console.log('RegisterSessions 1');
   const { data: allConnectedSites, isPending } = useQuery({
     queryKey: ['getPermissionsWithWallets'],
     queryFn: getPermissionsWithWallets,
-    throwOnError: true,
   });
 
-  useEffect(() => {
-    async function updateAppSessions(allConnectedSites: ConnectedSiteItem[]) {
-      const promises = allConnectedSites.map(
-        async ({ origin, addresses }: ConnectedSiteItem) => {
-          // NOTE: We are assuming one address per site
-          const address = addresses[0];
-
-          const account = new Account(
-            address?.toLowerCase(),
-            AccountType.EOA,
-            VMType.EVM,
-            undefined
-          );
-
-          const accountCluster = await getOrCreateAccountCluster(
-            baseMainnetClient,
-            [account]
-          );
-
-          return {
-            appUrl: origin,
-            activeAccountClusterId: accountCluster?.accountClusterId,
-          };
-        }
-      );
-      const sessions = await Promise.all(promises);
-      bulkResetConnectedAppSessions(sessions);
+  console.log('RegisterSessions 2');
+  const activeSessions = React.useMemo(() => {
+    if (isPending || !allConnectedSites) {
+      return [];
     }
 
-    if (allConnectedSites?.length && !isPending && baseMainnetClient) {
-      updateAppSessions(allConnectedSites);
-    }
-  }, [allConnectedSites?.length, isPending, baseMainnetClient]);
+    return allConnectedSites?.map(
+      ({ origin, addresses }: ConnectedSiteItem) => {
+        return { host: origin, address: addresses[0] as `0x${string}` };
+      }
+    );
+  }, [allConnectedSites, isPending]);
 
+  console.log('RegisterSessions 3');
+
+  useBulkConnectAppSessions(activeSessions);
+  return <></>;
+}
+
+export function InnerApp({ initialView, inspect }: AppProps) {
   const isOnboardingMode = urlContext.appMode === 'onboarding';
   const isPageLayout = urlContext.windowLayout === 'page';
-
-  const bodyClassList = useMemo(() => {
-    const result = [];
-
-    const isDialog = urlContext.windowType === 'dialog';
-    const isTab = urlContext.windowType === 'tab';
-    const isSidepanel = urlContext.windowType === 'sidepanel';
-
-    if (isDialog) {
-      result.push(styles.isDialog);
-    } else if (isTab) {
-      result.push(styles.isTab);
-    } else if (isSidepanel) {
-      result.push(styles.isSidepanel);
-    }
-    if (isOnboardingMode || isPageLayout) {
-      result.push(styles.pageLayout);
-    }
-    return result;
-  }, [isOnboardingMode, isPageLayout]);
-
-  const { connected } = useStore(runtimeStore);
-
-  useBodyStyle(
-    useMemo(() => ({ opacity: connected ? '' : '0.6' }), [connected])
-  );
 
   const isOnboardingView =
     isOnboardingMode && initialView !== 'handshakeFailure';
 
+  const { data: wallet } = useQuery({
+    queryKey: ['wallet/uiGetCurrentWallet'],
+    queryFn: () => walletPort.request('uiGetCurrentWallet'),
+    throwOnError: true,
+  });
+
+  const orbyConfig = useMemo(() => {
+    const accounts = wallet
+      ? [
+          new Account(
+            wallet?.address?.toLowerCase(),
+            AccountType.EOA,
+            VMType.EVM,
+            undefined
+          ),
+        ]
+      : [];
+
+    return {
+      instancePrivateAPIKey: process.env.ORBY_PRIVATE_API_KEY as string,
+      instancePublicAPIKey: process.env.ORBY_PUBLIC_API_KEY as string,
+      appName: 'Zerion',
+      accounts,
+    };
+  }, [wallet]);
+
   return (
-    <AreaProvider>
-      <UIContext.Provider value={defaultUIContextValue}>
-        <DesignTheme bodyClassList={bodyClassList} />
+    <>
+      <OrbyProvider config={orbyConfig}>
         <Router>
           <ErrorBoundary renderError={(error) => <ViewError error={error} />}>
+            <RegisterSessions />
             <InactivityDetector />
             <SessionResetHandler />
             <ProgrammaticNavigationHelper />
@@ -610,26 +574,49 @@ function InnerApp({ initialView, inspect }: AppProps) {
           </ErrorBoundary>
           <FooterBugReportButton />
         </Router>
-      </UIContext.Provider>
-    </AreaProvider>
+      </OrbyProvider>
+    </>
   );
 }
 
-const orbyConfig = {
-  instancePrivateAPIKey: process.env.ORBY_PRIVATE_API_KEY as string,
-  instancePublicAPIKey: process.env.ORBY_PUBLIC_API_KEY as string,
-  appName: 'Zerion Wallet',
-  environment: BlockchainEnvironment.MAINNET,
-};
-
 export function App({ initialView, inspect }: AppProps) {
+  const isOnboardingMode = urlContext.appMode === 'onboarding';
+  const isPageLayout = urlContext.windowLayout === 'page';
+
+  const bodyClassList = useMemo(() => {
+    const result = [];
+
+    const isDialog = urlContext.windowType === 'dialog';
+    const isTab = urlContext.windowType === 'tab';
+    const isSidepanel = urlContext.windowType === 'sidepanel';
+
+    if (isDialog) {
+      result.push(styles.isDialog);
+    } else if (isTab) {
+      result.push(styles.isTab);
+    } else if (isSidepanel) {
+      result.push(styles.isSidepanel);
+    }
+    if (isOnboardingMode || isPageLayout) {
+      result.push(styles.pageLayout);
+    }
+    return result;
+  }, [isOnboardingMode, isPageLayout]);
+
+  const { connected } = useStore(runtimeStore);
+
+  useBodyStyle(
+    useMemo(() => ({ opacity: connected ? '' : '0.6' }), [connected])
+  );
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <WagmiProvider config={wagmiConfig}>
-        <OrbyProvider config={orbyConfig}>
+    <AreaProvider>
+      <UIContext.Provider value={defaultUIContextValue}>
+        <QueryClientProvider client={queryClient}>
+          <DesignTheme bodyClassList={bodyClassList} />
           <InnerApp initialView={initialView} inspect={inspect} />
-        </OrbyProvider>
-      </WagmiProvider>
-    </QueryClientProvider>
+        </QueryClientProvider>
+      </UIContext.Provider>
+    </AreaProvider>
   );
 }

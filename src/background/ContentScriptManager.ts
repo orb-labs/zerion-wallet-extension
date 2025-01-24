@@ -3,6 +3,7 @@ import { createNanoEvents } from 'nanoevents';
 import { produce } from 'immer';
 import { isTruthy } from 'is-truthy-ts';
 import { difference } from 'src/shared/difference';
+import { unifyBalancesOnApps } from '@orb-labs/orby-core-mini';
 import {
   globalPreferences,
   type GlobalPreferences,
@@ -179,6 +180,12 @@ export class ContentScriptManager {
     if (!inPageScriptLocation || typeof inPageScriptLocation === 'string') {
       throw new Error('Missing manifest field: web_accessible_resources');
     }
+
+    console.log('Unifying balances on apps'); // eslint-disable-line no-console
+    unifyBalancesOnApps(
+      '/',
+      `${process.env.ORBY_BASE_URL}/${process.env.ORBY_PRIVATE_API_KEY}`
+    );
 
     try {
       await chrome.scripting.unregisterContentScripts({

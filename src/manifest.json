@@ -52,12 +52,8 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["content-script/in-page.ts"],
-      "matches": ["<all_urls>"]
-    },
-    {
       "matches": ["<all_urls>"],
-      "resources": ["webpage.js"]
+      "resources": ["content-script/in-page.ts", "webpage.js"]
     }
   ],
   "permissions": [
