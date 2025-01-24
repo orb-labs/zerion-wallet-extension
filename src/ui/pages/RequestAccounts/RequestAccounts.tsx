@@ -1,6 +1,9 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
+import { updateConnectedAppSession } from '@orb-labs/orby-core-mini';
+import { Account, AccountType, VMType } from '@orb-labs/orby-core';
+import { useOrby } from '@orb-labs/orby-react';
 import { PageColumn } from 'src/ui/components/PageColumn';
 import { walletPort, windowPort } from 'src/ui/shared/channels';
 import { Spacer } from 'src/ui/ui-kit/Spacer';
@@ -33,6 +36,8 @@ import { NavigationTitle } from 'src/ui/components/NavigationTitle';
 import type { WalletGroup } from 'src/shared/types/WalletGroup';
 import type { BareWallet } from 'src/shared/types/BareWallet';
 import type { DeviceAccount } from 'src/shared/types/Device';
+import { useAddressParams } from 'src/ui/shared/user-address/useAddressParams';
+import { getOrCreateAccountCluster } from 'src/ui/shared/orby';
 import { ZStack } from 'src/ui/ui-kit/ZStack';
 import { WalletList } from '../WalletSelect/WalletList';
 
@@ -282,11 +287,29 @@ export function RequestAccounts() {
       return walletPort.request('uiGetCurrentWallet');
     },
   });
+  const { baseMainnetClient } = useOrby();
+
   const handleConfirm = useCallback(
-    (result: { address: string; origin: string }) => {
+    async (result: { address: string; origin: string }) => {
       windowPort.confirm(windowId, result);
+
+      const account = new Account(
+        result.address,
+        AccountType.EOA,
+        VMType.EVM,
+        undefined
+      );
+
+      const accountCluster = await getOrCreateAccountCluster(
+        baseMainnetClient,
+        [account]
+      );
+      updateConnectedAppSession({
+        appUrl: result.origin,
+        activeAccountClusterId: accountCluster?.accountClusterId,
+      });
     },
-    [windowId]
+    [windowId, baseMainnetClient]
   );
   const handleReject = () => windowPort.reject(windowId);
 

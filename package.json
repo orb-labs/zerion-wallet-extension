@@ -4,7 +4,7 @@
   "description": "A web3 wallet extension",
   "scripts": {
     "prestart": "node scripts/verifyDotEnv.cjs",
-    "start": "npm-run-all --parallel start:app type-check:watch",
+    "start": "npm-run-all --parallel start:app",
     "start:app": "parcel watch src/manifest.json src/ui/hardware-wallet/ledger.html --no-hmr --no-content-hash --no-autoinstall",
     "build": "echo \"Please run 'npm run build:production' instead\" && exit 1",
     "build:production": "node scripts/build.js",
@@ -15,12 +15,18 @@
     "lint": "eslint . --cache --fix --ext .ts,.tsx,.js",
     "format": "prettier --loglevel warn --write \"**/*.{ts,tsx,css,md}\"",
     "prepare": "husky install",
-    "postversion": "node ./scripts/manifest-version.js"
+    "postversion": "node ./scripts/manifest-version.js",
+    "copy-webpage": "cp ./node_modules/@orb-labs/orby-core-mini/dist/webpage.min.js ./dist/webpage.js"
   },
   "alias": {
+    "@orb-labs/orby-core": "@orb-labs/orby-core/dist/index.js",
+    "@orb-labs/orby-core-mini": "@orb-labs/orby-core-mini/dist/index.js",
+    "@orb-labs/orby-react": "@orb-labs/orby-react/dist/index.js",
+    "@orb-labs/orby-viem-extension": "@orb-labs/orby-viem-extension/dist/index.js",
     "src": "./src",
     "zksync-ethers": "zksync-ethers/build",
     "ethers": "ethers/lib.commonjs",
+    "ethers/lib/utils": "ethers/lib.commonjs/utils",
     "ui-lab:src/ui/shared/channels": "./src/ui/shared/channels.mock.ts",
     "ui-lab:src/modules/networks/networks-store.client": "./src/modules/networks/networks-store.client.mock.ts",
     "ui-lab:src/background/constants": "./src/background/constants.mock.ts",
@@ -99,9 +105,13 @@
     "@ethersproject/bignumber": "^5.7.0",
     "@ethersproject/hdnode": "^5.7.0",
     "@ethersproject/wallet": "^5.7.0",
+    "@orb-labs/orby-core": "^0.0.14",
+    "@orb-labs/orby-core-mini": "^0.0.7",
+    "@orb-labs/orby-react": "^0.0.43",
+    "@orb-labs/orby-viem-extension": "^0.0.13",
     "@react-spring/web": "^9.7.3",
     "@store-unit/react": "^1.0.4",
-    "@tanstack/react-query": "^4.35.3",
+    "@tanstack/react-query": "^5.35.5",
     "@tanstack/react-virtual": "^3.2.0",
     "@walletconnect/jsonrpc-provider": "^1.0.13",
     "@walletconnect/jsonrpc-utils": "^1.0.8",
@@ -136,6 +146,7 @@
     "rlp": "^3.0.0",
     "store-unit": "^1.0.3",
     "uuid": "^9.0.0",
+    "wagmi": "^2.14.9",
     "webextension-polyfill": "^0.10.0",
     "zksync-ethers": "^6.15.2"
   }
