@@ -7,7 +7,6 @@ import { openOnboarding } from 'src/shared/openOnboarding';
 import { userLifecycleStore } from 'src/shared/analytics/shared/UserLifecycle';
 import { UrlContextParam } from 'src/shared/types/UrlContext';
 import { initializeSidepanel } from 'src/shared/sidepanel/initialize.background';
-import { unifyBalancesOnApps } from '@orb-labs/orby-core-mini';
 import { initialize } from './initialize';
 import { PortRegistry } from './messaging/PortRegistry';
 import { createWalletMessageHandler } from './messaging/port-message-handlers/createWalletMessageHandler';
@@ -208,9 +207,3 @@ browser.runtime.onInstalled.addListener(({ reason }) => {
     openOnboarding();
   }
 });
-
-// console.log('Unifying balances on apps'); // eslint-disable-line no-console
-// unifyBalancesOnApps(
-//   '/',
-//   `${process.env.ORBY_BASE_URL}/${process.env.ORBY_PRIVATE_API_KEY}`
-// );
