@@ -62,7 +62,10 @@
     "scripting",
     "sidePanel",
     "storage",
-    "unlimitedStorage"
+    "tabs",
+    "unlimitedStorage",
+    "clipboardWrite",
+    "notifications"
   ],
   "host_permissions": ["http://*/*", "https://*/*"]
 }
