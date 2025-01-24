@@ -528,7 +528,7 @@ function InnerApp({ initialView, inspect }: AppProps) {
     if (allConnectedSites?.length && !isPending && baseMainnetClient) {
       updateAppSessions(allConnectedSites);
     }
-  }, [allConnectedSites, isPending, baseMainnetClient]);
+  }, [allConnectedSites?.length, isPending, baseMainnetClient]);
 
   const isOnboardingMode = urlContext.appMode === 'onboarding';
   const isPageLayout = urlContext.windowLayout === 'page';
