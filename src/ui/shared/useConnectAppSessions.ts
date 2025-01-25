@@ -5,14 +5,12 @@ import { getPermissionsWithWallets } from 'src/ui/shared/requests/getPermissions
 import type { ConnectedSiteItem } from 'src/ui/shared/requests/getPermissionsWithWallets';
 
 export function useConnectAppSessions() {
-  console.log('useConnectAppSessions 1');
   const { data: allConnectedSites, isPending } = useQuery({
     queryKey: ['getPermissionsWithWallets'],
     queryFn: getPermissionsWithWallets,
     throwOnError: true,
   });
 
-  console.log('useConnectAppSessions 2', isPending, allConnectedSites);
   const activeSessions = React.useMemo(() => {
     if (isPending || !allConnectedSites) {
       return [];
@@ -24,8 +22,6 @@ export function useConnectAppSessions() {
       }
     );
   }, [allConnectedSites, isPending]);
-
-  console.log('activeSessions', activeSessions);
 
   const { isLoading, isConnected } = useBulkConnectAppSessions(activeSessions);
   return { isLoading, isConnected };

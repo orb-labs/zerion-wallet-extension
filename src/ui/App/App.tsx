@@ -468,13 +468,11 @@ export interface AppProps {
 }
 
 export function RegisterSessions() {
-  console.log('RegisterSessions 1');
   const { data: allConnectedSites, isPending } = useQuery({
     queryKey: ['getPermissionsWithWallets'],
     queryFn: getPermissionsWithWallets,
   });
 
-  console.log('RegisterSessions 2');
   const activeSessions = React.useMemo(() => {
     if (isPending || !allConnectedSites) {
       return [];
@@ -486,8 +484,6 @@ export function RegisterSessions() {
       }
     );
   }, [allConnectedSites, isPending]);
-
-  console.log('RegisterSessions 3');
 
   useBulkConnectAppSessions(activeSessions);
   return <></>;

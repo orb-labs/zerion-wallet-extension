@@ -286,8 +286,6 @@ export function RequestAccounts() {
   });
   const { baseMainnetClient } = useOrby();
 
-  console.log('inside RequestAccounts');
-
   const handleConfirm = useCallback(
     async (result: { address: string; origin: string }) => {
       const account = new Account(
@@ -297,15 +295,11 @@ export function RequestAccounts() {
         undefined
       );
 
-      console.log('before the connectAppSession', account);
-
-      const haha = await connectAppSession(
+      await connectAppSession(
         [account],
         result.origin || '',
         baseMainnetClient
       );
-
-      console.log('connectAppSession', haha);
 
       windowPort.confirm(windowId, result);
     },

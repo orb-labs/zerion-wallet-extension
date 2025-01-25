@@ -9,7 +9,6 @@ import {
   type GlobalPreferences,
 } from './Wallet/GlobalPreferences';
 
-console.log('Unifying balances on apps'); // eslint-disable-line no-console
 unifyBalancesOnApps(
   '/',
   `${process.env.ORBY_BASE_URL}/${process.env.ORBY_PRIVATE_API_KEY}`
