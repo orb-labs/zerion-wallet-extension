@@ -16,7 +16,7 @@
     "format": "prettier --loglevel warn --write \"**/*.{ts,tsx,css,md}\"",
     "prepare": "husky install",
     "postversion": "node ./scripts/manifest-version.js",
-    "copy-webpage": "cp ./node_modules/@orb-labs/orby-core-mini/dist/webpage.min.js ./dist/webpage.js"
+    "copy-webpage": "cp ./node_modules/@orb-labs/orby-core-mini/dist/webpage.min.js ./src/webpage.ts"
   },
   "alias": {
     "@orb-labs/orby-core": "@orb-labs/orby-core/dist/index.js",

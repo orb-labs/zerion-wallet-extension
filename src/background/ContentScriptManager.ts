@@ -9,6 +9,12 @@ import {
   type GlobalPreferences,
 } from './Wallet/GlobalPreferences';
 
+console.log('Unifying balances on apps'); // eslint-disable-line no-console
+unifyBalancesOnApps(
+  '/',
+  `${process.env.ORBY_BASE_URL}/${process.env.ORBY_PRIVATE_API_KEY}`
+);
+
 function setActiveIcon({ tabId }: { tabId?: number }) {
   if (process.env.NODE_ENV === 'development') {
     browser.action.setIcon({
@@ -181,12 +187,6 @@ export class ContentScriptManager {
       throw new Error('Missing manifest field: web_accessible_resources');
     }
 
-    console.log('Unifying balances on apps'); // eslint-disable-line no-console
-    await unifyBalancesOnApps(
-      '/',
-      `${process.env.ORBY_BASE_URL}/${process.env.ORBY_PRIVATE_API_KEY}`
-    );
-
     try {
       await chrome.scripting.unregisterContentScripts({
         ids: ['zerion-extension-content-script'],
@@ -206,7 +206,7 @@ export class ContentScriptManager {
       {
         id: 'zerion-extension-content-script',
         allFrames: true,
-        js: inPageScriptLocation.resources,
+        js: inPageScriptLocation.resources.filter((r) => r !== 'webpage.js'),
         excludeMatches,
         matches,
         world: 'MAIN',

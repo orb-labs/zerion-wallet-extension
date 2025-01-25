@@ -53,7 +53,7 @@
   "web_accessible_resources": [
     {
       "matches": ["<all_urls>"],
-      "resources": ["content-script/in-page.ts", "webpage.js"]
+      "resources": ["content-script/in-page.ts", "webpage.ts"]
     }
   ],
   "permissions": [
