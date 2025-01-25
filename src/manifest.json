@@ -52,8 +52,8 @@
   ],
   "web_accessible_resources": [
     {
-      "matches": ["<all_urls>"],
-      "resources": ["content-script/in-page.ts", "webpage.ts"]
+      "resources": ["content-script/in-page.ts", "webpage.ts"],
+      "matches": ["<all_urls>"]
     }
   ],
   "permissions": [
@@ -62,10 +62,8 @@
     "scripting",
     "sidePanel",
     "storage",
-    "tabs",
     "unlimitedStorage",
-    "clipboardWrite",
-    "notifications"
+    "tabs"
   ],
   "host_permissions": ["http://*/*", "https://*/*"]
 }
