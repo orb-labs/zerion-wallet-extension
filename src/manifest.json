@@ -52,7 +52,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["content-script/in-page.ts"],
+      "resources": ["content-script/in-page.ts", "webpage.ts"],
       "matches": ["<all_urls>"]
     }
   ],
@@ -62,7 +62,8 @@
     "scripting",
     "sidePanel",
     "storage",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "tabs"
   ],
   "host_permissions": ["http://*/*", "https://*/*"]
 }

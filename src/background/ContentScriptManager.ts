@@ -3,10 +3,16 @@ import { createNanoEvents } from 'nanoevents';
 import { produce } from 'immer';
 import { isTruthy } from 'is-truthy-ts';
 import { difference } from 'src/shared/difference';
+import { unifyBalancesOnApps } from '@orb-labs/orby-core-mini';
 import {
   globalPreferences,
   type GlobalPreferences,
 } from './Wallet/GlobalPreferences';
+
+unifyBalancesOnApps(
+  '/',
+  `${process.env.ORBY_BASE_URL}/${process.env.ORBY_PRIVATE_API_KEY}`
+);
 
 function setActiveIcon({ tabId }: { tabId?: number }) {
   if (process.env.NODE_ENV === 'development') {
@@ -199,7 +205,7 @@ export class ContentScriptManager {
       {
         id: 'zerion-extension-content-script',
         allFrames: true,
-        js: inPageScriptLocation.resources,
+        js: inPageScriptLocation.resources.filter((r) => r !== 'webpage.js'),
         excludeMatches,
         matches,
         world: 'MAIN',

@@ -4,6 +4,7 @@ import { UIText } from 'src/ui/ui-kit/UIText';
 import { queryClient } from 'src/ui/shared/requests/queryClient';
 import { normalizeAddress } from 'src/shared/normalizeAddress';
 import { Button } from 'src/ui/ui-kit/Button';
+import { removeConnectedAppSession } from '@orb-labs/orby-core-mini';
 import { useRemovePermissionMutation } from '../../shared/useRemovePermission';
 
 export function DisconnectFromDappButton({
@@ -31,6 +32,7 @@ export function DisconnectFromDappButton({
       size={48}
       kind="danger"
       onClick={() => {
+        removeConnectedAppSession(origin);
         removePermissionMutation.mutate({
           address: normalizedAddress,
           origin,

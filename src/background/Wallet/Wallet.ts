@@ -1450,6 +1450,50 @@ export class Wallet {
     return { ethereumChainConfigs, visitedChains };
   }
 
+  async addVirtualNodes({
+    params: { virtualNodeUrls },
+  }: WalletMethodParams<{
+    virtualNodeUrls: { rpcUrl: string; chainId: number }[];
+  }>) {
+    const preferences = await this.getPreferences({
+      context: INTERNAL_SYMBOL_CONTEXT,
+    });
+    const networksStore = getNetworksStore(preferences);
+
+    if (virtualNodeUrls.length == 0) {
+      return;
+    }
+
+    const networks = networksStore.getState().networks?.getNetworks();
+    if (!networks || networks.length == 0) {
+      return;
+    }
+
+    const allConfigs = virtualNodeUrls
+      .map(({ chainId, rpcUrl }) => {
+        const network = networks?.find(
+          (network) =>
+            network?.specification?.eip155?.id?.toString() ==
+            chainId?.toString()
+        );
+
+        if (!network) {
+          return null;
+        }
+
+        const configs = {
+          ...network,
+          rpc_url_user: rpcUrl,
+          rpc_url_internal: rpcUrl,
+        };
+
+        return configs;
+      })
+      .filter((network) => network !== null) as NetworkConfig[];
+
+    await networksStore.pushConfigs(allConfigs);
+  }
+
   async getPendingTransactions({ context }: PublicMethodParams) {
     this.verifyInternalOrigin(context);
     return this.record?.transactions || [];

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { AreaProvider } from 'react-area';
 import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import {
@@ -23,6 +23,12 @@ import { SignTypedData } from 'src/ui/pages/SignTypedData';
 import { useStore } from '@store-unit/react';
 import { runtimeStore } from 'src/shared/core/runtime-store';
 import { useDefiSdkClient } from 'src/modules/defi-sdk/useDefiSdkClient';
+import { OrbyProvider, useOrby } from '@orb-labs/orby-react';
+import { Account, AccountType, VMType } from '@orb-labs/orby-core';
+import { useBulkConnectAppSessions } from '@orb-labs/orby-react';
+import { getPermissionsWithWallets } from 'src/ui/shared/requests/getPermissionsWithWallets';
+import type { ConnectedSiteItem } from 'src/ui/shared/requests/getPermissionsWithWallets';
+import { useMutation } from '@tanstack/react-query';
 import { Login } from '../pages/Login';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import {
@@ -105,7 +111,7 @@ const useAuthState = () => {
         wallet,
       };
     },
-    throwOnError: true,
+    // useErrorBoundary: true,
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -462,6 +468,140 @@ export interface AppProps {
   inspect?: { message: string };
 }
 
+export function RegisterSessions() {
+  const { data: allConnectedSites, isPending } = useQuery({
+    queryKey: ['getPermissionsWithWallets'],
+    queryFn: getPermissionsWithWallets,
+  });
+
+  const { getVirtualNodeRpcUrlsForSupportedChains } = useOrby();
+  const activeSessions = React.useMemo(() => {
+    if (isPending || !allConnectedSites) {
+      return [];
+    }
+
+    return allConnectedSites?.map(
+      ({ origin, addresses }: ConnectedSiteItem) => {
+        return { host: origin, address: addresses[0] as `0x${string}` };
+      }
+    );
+  }, [allConnectedSites, isPending]);
+
+  const virtualNodeUrls = useMemo(() => {
+    return getVirtualNodeRpcUrlsForSupportedChains()?.map((virtualNodeUrl) => {
+      return {
+        rpcUrl: virtualNodeUrl.virtualNodeRpcUrl,
+        chainId: Number(virtualNodeUrl.chainId),
+      };
+    });
+  }, [getVirtualNodeRpcUrlsForSupportedChains]);
+
+  const addVirtualNodesMutation = useMutation({
+    mutationFn: async () => {
+      await walletPort.request('addVirtualNodes', { virtualNodeUrls });
+    },
+  });
+
+  // Only trigger the mutation when virtualNodeUrls reference changes
+  const previousVirtualNodeUrlsRef = React.useRef(virtualNodeUrls);
+
+  useEffect(() => {
+    if (previousVirtualNodeUrlsRef.current !== virtualNodeUrls) {
+      addVirtualNodesMutation.mutate();
+      previousVirtualNodeUrlsRef.current = virtualNodeUrls;
+    }
+  }, [virtualNodeUrls, addVirtualNodesMutation]);
+
+  useBulkConnectAppSessions(activeSessions);
+  return <></>;
+}
+
+export function InnerApp({ initialView, inspect }: AppProps) {
+  const isOnboardingMode = urlContext.appMode === 'onboarding';
+  const isPageLayout = urlContext.windowLayout === 'page';
+
+  const isOnboardingView =
+    isOnboardingMode && initialView !== 'handshakeFailure';
+
+  const { data: wallet } = useQuery({
+    queryKey: ['wallet/uiGetCurrentWallet'],
+    queryFn: () => walletPort.request('uiGetCurrentWallet'),
+    throwOnError: true,
+  });
+
+  const orbyConfig = useMemo(() => {
+    const accounts = wallet
+      ? [
+          new Account(
+            wallet?.address?.toLowerCase(),
+            AccountType.EOA,
+            VMType.EVM,
+            undefined
+          ),
+        ]
+      : [];
+
+    return {
+      instancePrivateAPIKey: process.env.ORBY_PRIVATE_API_KEY as string,
+      instancePublicAPIKey: process.env.ORBY_PUBLIC_API_KEY as string,
+      appName: 'Zerion',
+      accounts,
+    };
+  }, [wallet]);
+
+  return (
+    <>
+      <OrbyProvider config={orbyConfig}>
+        <Router>
+          <ErrorBoundary renderError={(error) => <ViewError error={error} />}>
+            <RegisterSessions />
+            <InactivityDetector />
+            <SessionResetHandler />
+            <ProgrammaticNavigationHelper />
+            <ThemeDecoration />
+            {inspect && !isProd ? (
+              <UIText
+                kind="small/regular"
+                style={{
+                  borderBottom: '1px solid var(--neutral-300)',
+                  paddingInline: 12,
+                }}
+              >
+                {inspect.message}
+              </UIText>
+            ) : null}
+            <GlobalKeyboardShortcuts />
+            <VersionUpgrade>
+              {!isOnboardingView && !isPageLayout ? (
+                // Render above <ViewSuspense /> so that it doesn't flicker
+                <MaybeTestModeDecoration />
+              ) : null}
+              <ViewSuspense logDelays={true}>
+                {isOnboardingView ? (
+                  <Onboarding />
+                ) : isPageLayout ? (
+                  <PageLayoutViews />
+                ) : (
+                  <DefiSdkClientProvider>
+                    <Views
+                      initialRoute={
+                        initialView === 'handshakeFailure'
+                          ? '/handshake-failure'
+                          : undefined
+                      }
+                    />
+                  </DefiSdkClientProvider>
+                )}
+              </ViewSuspense>
+            </VersionUpgrade>
+          </ErrorBoundary>
+          <FooterBugReportButton />
+        </Router>
+      </OrbyProvider>
+    </>
+  );
+}
+
 export function App({ initialView, inspect }: AppProps) {
   const isOnboardingMode = urlContext.appMode === 'onboarding';
   const isPageLayout = urlContext.windowLayout === 'page';
@@ -492,58 +632,12 @@ export function App({ initialView, inspect }: AppProps) {
     useMemo(() => ({ opacity: connected ? '' : '0.6' }), [connected])
   );
 
-  const isOnboardingView =
-    isOnboardingMode && initialView !== 'handshakeFailure';
-
   return (
     <AreaProvider>
       <UIContext.Provider value={defaultUIContextValue}>
         <QueryClientProvider client={queryClient}>
           <DesignTheme bodyClassList={bodyClassList} />
-          <Router>
-            <ErrorBoundary renderError={(error) => <ViewError error={error} />}>
-              <InactivityDetector />
-              <SessionResetHandler />
-              <ProgrammaticNavigationHelper />
-              <ThemeDecoration />
-              {inspect && !isProd ? (
-                <UIText
-                  kind="small/regular"
-                  style={{
-                    borderBottom: '1px solid var(--neutral-300)',
-                    paddingInline: 12,
-                  }}
-                >
-                  {inspect.message}
-                </UIText>
-              ) : null}
-              <GlobalKeyboardShortcuts />
-              <VersionUpgrade>
-                {!isOnboardingView && !isPageLayout ? (
-                  // Render above <ViewSuspense /> so that it doesn't flicker
-                  <MaybeTestModeDecoration />
-                ) : null}
-                <ViewSuspense logDelays={true}>
-                  {isOnboardingView ? (
-                    <Onboarding />
-                  ) : isPageLayout ? (
-                    <PageLayoutViews />
-                  ) : (
-                    <DefiSdkClientProvider>
-                      <Views
-                        initialRoute={
-                          initialView === 'handshakeFailure'
-                            ? '/handshake-failure'
-                            : undefined
-                        }
-                      />
-                    </DefiSdkClientProvider>
-                  )}
-                </ViewSuspense>
-              </VersionUpgrade>
-            </ErrorBoundary>
-            <FooterBugReportButton />
-          </Router>
+          <InnerApp initialView={initialView} inspect={inspect} />
         </QueryClientProvider>
       </UIContext.Provider>
     </AreaProvider>

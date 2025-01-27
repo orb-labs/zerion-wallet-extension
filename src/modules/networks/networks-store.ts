@@ -170,7 +170,7 @@ export class NetworksStore extends Store<State> {
     return this.updateNetworks();
   }
 
-  async pushConfigs(...extraNetworkConfigs: NetworkConfig[]) {
+  async pushConfigs(extraNetworkConfigs: NetworkConfig[]) {
     this.networkConfigs = mergeNetworkConfigs(
       this.networkConfigs,
       extraNetworkConfigs

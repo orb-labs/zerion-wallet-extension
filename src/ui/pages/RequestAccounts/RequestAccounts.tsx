@@ -1,6 +1,8 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
+import { Account, AccountType, VMType } from '@orb-labs/orby-core';
+import { connectAppSession, useOrby } from '@orb-labs/orby-react';
 import { PageColumn } from 'src/ui/components/PageColumn';
 import { walletPort, windowPort } from 'src/ui/shared/channels';
 import { Spacer } from 'src/ui/ui-kit/Spacer';
@@ -282,11 +284,26 @@ export function RequestAccounts() {
       return walletPort.request('uiGetCurrentWallet');
     },
   });
+  const { baseMainnetClient } = useOrby();
+
   const handleConfirm = useCallback(
-    (result: { address: string; origin: string }) => {
+    async (result: { address: string; origin: string }) => {
+      const account = new Account(
+        result.address,
+        AccountType.EOA,
+        VMType.EVM,
+        undefined
+      );
+
+      await connectAppSession(
+        [account],
+        result.origin || '',
+        baseMainnetClient
+      );
+
       windowPort.confirm(windowId, result);
     },
-    [windowId]
+    [windowId, baseMainnetClient]
   );
   const handleReject = () => windowPort.reject(windowId);
 

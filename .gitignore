@@ -3,3 +3,5 @@ dist
 .env
 .eslintcache
 .parcel-cache
+.tool-versions
+src/webpage.ts
