@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { AreaProvider } from 'react-area';
 import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import {
@@ -23,11 +23,12 @@ import { SignTypedData } from 'src/ui/pages/SignTypedData';
 import { useStore } from '@store-unit/react';
 import { runtimeStore } from 'src/shared/core/runtime-store';
 import { useDefiSdkClient } from 'src/modules/defi-sdk/useDefiSdkClient';
-import { OrbyProvider } from '@orb-labs/orby-react';
+import { OrbyProvider, useOrby } from '@orb-labs/orby-react';
 import { Account, AccountType, VMType } from '@orb-labs/orby-core';
 import { useBulkConnectAppSessions } from '@orb-labs/orby-react';
 import { getPermissionsWithWallets } from 'src/ui/shared/requests/getPermissionsWithWallets';
 import type { ConnectedSiteItem } from 'src/ui/shared/requests/getPermissionsWithWallets';
+import { useMutation } from '@tanstack/react-query';
 import { Login } from '../pages/Login';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import {
@@ -473,6 +474,7 @@ export function RegisterSessions() {
     queryFn: getPermissionsWithWallets,
   });
 
+  const { getVirtualNodeRpcUrlsForSupportedChains } = useOrby();
   const activeSessions = React.useMemo(() => {
     if (isPending || !allConnectedSites) {
       return [];
@@ -484,6 +486,31 @@ export function RegisterSessions() {
       }
     );
   }, [allConnectedSites, isPending]);
+
+  const virtualNodeUrls = useMemo(() => {
+    return getVirtualNodeRpcUrlsForSupportedChains()?.map((virtualNodeUrl) => {
+      return {
+        rpcUrl: virtualNodeUrl.virtualNodeRpcUrl,
+        chainId: Number(virtualNodeUrl.chainId),
+      };
+    });
+  }, [getVirtualNodeRpcUrlsForSupportedChains]);
+
+  const addVirtualNodesMutation = useMutation({
+    mutationFn: async () => {
+      await walletPort.request('addVirtualNodes', { virtualNodeUrls });
+    },
+  });
+
+  // Only trigger the mutation when virtualNodeUrls reference changes
+  const previousVirtualNodeUrlsRef = React.useRef(virtualNodeUrls);
+
+  useEffect(() => {
+    if (previousVirtualNodeUrlsRef.current !== virtualNodeUrls) {
+      addVirtualNodesMutation.mutate();
+      previousVirtualNodeUrlsRef.current = virtualNodeUrls;
+    }
+  }, [virtualNodeUrls, addVirtualNodesMutation]);
 
   useBulkConnectAppSessions(activeSessions);
   return <></>;
