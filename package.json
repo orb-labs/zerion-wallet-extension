@@ -107,7 +107,7 @@
     "@ethersproject/wallet": "^5.7.0",
     "@orb-labs/orby-core": "^0.0.14",
     "@orb-labs/orby-core-mini": "^0.0.7",
-    "@orb-labs/orby-react": "^0.0.43",
+    "@orb-labs/orby-react": "^0.0.44",
     "@orb-labs/orby-viem-extension": "^0.0.13",
     "@react-spring/web": "^9.7.3",
     "@store-unit/react": "^1.0.4",
