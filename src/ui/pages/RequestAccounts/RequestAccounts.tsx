@@ -43,6 +43,9 @@ import {
   SecurityStatusBackground,
   DappSecurityCheck,
 } from 'src/ui/shared/security-check';
+import { useOrby } from '@orb-labs/orby-react';
+import { updateConnectedAppSession } from '@orb-labs/orby-core-mini';
+import { useIsOneClickTransactionsAndGasAbstractionEnabled } from 'src/shared/core/useIsOneClickTransactionsAndGasAbstractionEnabled';
 import { WalletList } from '../WalletSelect/WalletList';
 
 const ECOSYSTEM_ICONS: Record<BlockchainType, { src: string; srcSet: string }> =
@@ -326,6 +329,10 @@ export function RequestAccounts() {
   invariant(origin, 'origin get-parameter is required');
   invariant(windowId, 'windowId get-parameter is required');
 
+  const oneClickTransactionsAndGasAbstractionEnabled =
+    useIsOneClickTransactionsAndGasAbstractionEnabled();
+  const { accountCluster } = useOrby();
+
   const { data, isLoading, isError, error } = useQuery({
     retry: 1,
     queryKey: ['prepareRequestAccountsViewData', ecosystem],
@@ -363,8 +370,20 @@ export function RequestAccounts() {
   const handleConfirm = useCallback(
     (result: { address: string; origin: string }) => {
       windowPort.confirm(windowId, result);
+
+      if (accountCluster && oneClickTransactionsAndGasAbstractionEnabled) {
+        updateConnectedAppSession({
+          appUrl: origin,
+          activeAccountClusterId: accountCluster?.accountClusterId,
+        });
+      }
     },
-    [windowId]
+    [
+      windowId,
+      accountCluster,
+      origin,
+      oneClickTransactionsAndGasAbstractionEnabled,
+    ]
   );
   const handleReject = () => windowPort.reject(windowId);
 

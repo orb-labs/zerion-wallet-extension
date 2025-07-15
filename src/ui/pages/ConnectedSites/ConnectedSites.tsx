@@ -27,6 +27,7 @@ import { Spacer } from 'src/ui/ui-kit/Spacer';
 import { FillView } from 'src/ui/components/FillView';
 import type { InputHandle } from 'src/ui/ui-kit/Input/DebouncedInput';
 import { DebouncedInput } from 'src/ui/ui-kit/Input/DebouncedInput';
+import { removeConnectedAppSession } from '@orb-labs/orby-core-mini';
 import { ConnectedSite } from './ConnectedSite';
 
 function RevokeAllPermissionsComponent({
@@ -267,7 +268,13 @@ function ConnectedSitesMain() {
         <ConnectedSitesList
           showRevokeAll={!searchQuery}
           items={itemsToDisplay}
-          onRevokeAll={() => connectedSitesQuery.refetch()}
+          onRevokeAll={() => {
+            allConnectedSites?.map((site) => {
+              removeConnectedAppSession(site.origin);
+            });
+
+            connectedSitesQuery.refetch();
+          }}
         />
       ) : (
         <EmptyView
