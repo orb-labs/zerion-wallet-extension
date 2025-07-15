@@ -7,3 +7,6 @@ dist
 /e2e-report/
 /blob-report/
 /playwright/.cache/
+src/content-script/core-webpage-injector.js
+src/content-script/core-webpage.js
+src/content-script/webpage.js
