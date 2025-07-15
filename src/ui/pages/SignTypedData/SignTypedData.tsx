@@ -67,17 +67,28 @@ import { INTERNAL_ORIGIN } from 'src/background/constants';
 import {
   useGetFungibleTokenPortfolio,
   useGetOperationsToSignTransactionOrSignTypedData,
+  useOrby,
 } from '@orb-labs/orby-react';
 import {
   CreateOperationsStatus,
   type OnchainOperation,
 } from '@orb-labs/orby-core';
-import type { OperationSet, StandardizedBalance } from '@orb-labs/orby-core';
+import type {
+  OperationSet,
+  OperationStatus,
+  StandardizedBalance,
+} from '@orb-labs/orby-core';
+import { OperationStatusType } from '@orb-labs/orby-core';
 import type { Client } from 'viem';
 import type { HttpTransport } from 'viem';
 import type { PublicRpcSchema } from 'viem';
 import type { OrbyActions } from '@orb-labs/orby-viem-extension';
 import _ from 'lodash';
+import {
+  signTransaction,
+  signTypedData,
+  signUserOperation,
+} from 'src/shared/core/orb';
 import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
 import { PopoverToast } from '../Settings/PopoverToast';
 import type { PopoverToastHandle } from '../Settings/PopoverToast';
@@ -125,6 +136,8 @@ function TypedDataDefaultView({
   setSelectedGasToken,
   fungibleTokens,
   aggregateFee,
+  virtualNode,
+  operationSet,
 }: {
   origin: string;
   clientScope: string | null;
@@ -163,7 +176,10 @@ function TypedDataDefaultView({
   const dialogRef = useRef<HTMLDialogElementInterface | null>(null);
   const [params] = useSearchParams();
   const { preferences } = usePreferences();
+  const { accountCluster } = useOrby();
   const isOrbyEnabled = useIsOrbyEnabled(BigInt(chain.value));
+  const [submitOperationSetIsLoading, setSubmitOperationSetIsLoading] =
+    useState(false);
 
   const addressAction = interpretation?.action;
   const recipientAddress = addressAction?.label?.display_value.wallet_address;
@@ -218,6 +234,56 @@ function TypedDataDefaultView({
       },
     }
   );
+
+  const operationStatusesUpdated = useCallback(
+    async (
+      statusSummary: OperationStatusType,
+      _finalTransactionStatus?: OperationStatus,
+      _statuses?: OperationStatus[]
+    ) => {
+      if (
+        [OperationStatusType.SUCCESSFUL, OperationStatusType.PENDING].includes(
+          statusSummary
+        )
+      ) {
+        signTypedData_v4();
+        setSubmitOperationSetIsLoading(false);
+      }
+    },
+    [signTypedData_v4]
+  );
+
+  const submitTransaction = useCallback(async () => {
+    if (isOrbyEnabled) {
+      if (accountCluster && virtualNode && virtualNode) {
+        setSubmitOperationSetIsLoading(true);
+        const { operationResponses } = await virtualNode.sendOperationSet(
+          accountCluster,
+          operationSet,
+          signTransaction,
+          signUserOperation,
+          signTypedData
+        );
+
+        const ids = operationResponses
+          ?.map((op) => op.id)
+          .filter((id) => !_.isUndefined(id));
+        virtualNode?.subscribeToOperationStatuses(
+          ids,
+          operationStatusesUpdated
+        );
+      }
+    } else {
+      signTypedData_v4();
+    }
+  }, [
+    accountCluster,
+    operationSet,
+    virtualNode,
+    operationStatusesUpdated,
+    isOrbyEnabled,
+    signTypedData_v4,
+  ]);
 
   const interpretationHasCriticalWarning = hasCriticalWarning(
     interpretation?.warnings
@@ -493,7 +559,7 @@ function TypedDataDefaultView({
                   wallet={wallet}
                   ref={signMsgBtnRef}
                   onClick={() => {
-                    signTypedData_v4();
+                    submitTransaction();
                   }}
                   buttonKind={
                     interpretationHasCriticalWarning ? 'danger' : 'primary'
@@ -504,6 +570,7 @@ function TypedDataDefaultView({
                       : undefined
                   }
                   holdToSign={preferences.enableHoldToSignButton}
+                  submitOperationSetIsLoading={submitOperationSetIsLoading}
                 />
               ) : null}
             </div>
@@ -539,6 +606,7 @@ function SignTypedDataContent({
   invariant(windowId, 'windowId get-parameter is required');
 
   const navigate = useNavigate();
+  // const { preferences } = usePreferences();
 
   const [allowanceQuantityBase, setAllowanceQuantityBase] = useState('');
   const [operationSetError, setOperationSetError] = useState<string | null>(
@@ -584,6 +652,12 @@ function SignTypedDataContent({
     standardizedTokenId: undefined,
     isDefault: true,
   });
+
+  const { accountCluster, baseMainnetClient } = useOrby();
+
+  accountCluster;
+
+  baseMainnetClient;
 
   const gasToken = useMemo(() => {
     return selectedGasToken?.standardizedTokenId

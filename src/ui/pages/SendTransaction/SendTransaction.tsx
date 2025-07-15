@@ -99,9 +99,22 @@ import ScrollIcon from 'jsx:src/ui/assets/scroll.svg';
 import ArrowDownIcon from 'jsx:src/ui/assets/caret-down-filled.svg';
 import { SiteFaviconImg } from 'src/ui/components/SiteFaviconImg';
 import { NetworkId } from 'src/modules/networks/NetworkId';
-import { useGetOperationsToExecuteTransaction } from '@orb-labs/orby-react';
-import { CreateOperationsStatus } from '@orb-labs/orby-core';
+import {
+  useGetOperationsToExecuteTransaction,
+  useOrby,
+} from '@orb-labs/orby-react';
+import type { OperationStatus } from '@orb-labs/orby-core';
+import {
+  CreateOperationsStatus,
+  OperationStatusType,
+} from '@orb-labs/orby-core';
+import {
+  signUserOperation,
+  signTransaction,
+  signTypedData,
+} from 'src/shared/core/orb';
 import _ from 'lodash';
+import type { Hex } from '@noble/ed25519';
 import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
 import type { PopoverToastHandle } from '../Settings/PopoverToast';
 import { PopoverToast } from '../Settings/PopoverToast';
@@ -564,6 +577,8 @@ function SendTransactionContent({
     });
 
   const [allowanceQuantityBase, setAllowanceQuantityBase] = useState('');
+  const [submitTransactionIsLoading, setSubmitTransactionIsLoading] =
+    useState(false);
   const [operationSetError, setOperationSetError] = useState<string | null>(
     null
   );
@@ -597,25 +612,30 @@ function SendTransactionContent({
     isDefault: true,
   });
 
+  const { accountCluster } = useOrby();
+
   const gasToken = useMemo(() => {
     return selectedGasToken?.standardizedTokenId
       ? { standardizedTokenId: selectedGasToken.standardizedTokenId }
       : undefined;
   }, [selectedGasToken]);
 
-  const { operationSet, isLoading: OperationSetLoading } =
-    useGetOperationsToExecuteTransaction(
-      isOrbyEnabled ? (wallet?.address as string) : undefined,
-      isOrbyEnabled && populatedTransaction?.chainId
-        ? BigInt(populatedTransaction?.chainId as number)
-        : undefined,
-      populatedTransaction?.to as string,
-      populatedTransaction?.data as string,
-      populatedTransaction?.value
-        ? BigInt(populatedTransaction?.value.toString())
-        : undefined,
-      gasToken
-    );
+  const {
+    operationSet,
+    virtualNode,
+    isLoading: OperationSetLoading,
+  } = useGetOperationsToExecuteTransaction(
+    isOrbyEnabled ? (wallet?.address as string) : undefined,
+    isOrbyEnabled && populatedTransaction?.chainId
+      ? BigInt(populatedTransaction?.chainId as number)
+      : undefined,
+    populatedTransaction?.to as string,
+    populatedTransaction?.data as string,
+    populatedTransaction?.value
+      ? BigInt(populatedTransaction?.value.toString())
+      : undefined,
+    gasToken
+  );
 
   const selectGasToken = useCallback(
     (gasToken?: GasTokenInput) => {
@@ -813,6 +833,72 @@ function SendTransactionContent({
     onSuccess: (tx) => handleSentTransaction(tx),
   });
 
+  const operationStatusesUpdated = useCallback(
+    async (
+      statusSummary: OperationStatusType,
+      finalTransactionStatus?: OperationStatus,
+      _statuses?: OperationStatus[]
+    ) => {
+      if (
+        [OperationStatusType.SUCCESSFUL, OperationStatusType.PENDING].includes(
+          statusSummary
+        )
+      ) {
+        if (virtualNode && finalTransactionStatus?.hash) {
+          const receipt = await (virtualNode as any).waitForTransactionReceipt({
+            hash: finalTransactionStatus.hash as Hex,
+          });
+
+          handleSentTransaction({
+            evm: {
+              ...receipt,
+              hash: receipt.transactionHash,
+              to: receipt.to,
+              from: receipt.from,
+              value: receipt.value,
+              data: receipt.data,
+            },
+          });
+
+          setSubmitTransactionIsLoading(false);
+        }
+      }
+    },
+    [handleSentTransaction, virtualNode]
+  );
+
+  const submitTransaction = useCallback(async () => {
+    if (isOrbyEnabled) {
+      if (accountCluster && virtualNode && virtualNode) {
+        setSubmitTransactionIsLoading(true);
+        const { operationResponses } = await virtualNode.sendOperationSet(
+          accountCluster,
+          operationSet,
+          signTransaction,
+          signUserOperation,
+          signTypedData
+        );
+
+        const ids = operationResponses
+          ?.map((op) => op.id)
+          .filter((id) => !_.isUndefined(id));
+        virtualNode?.subscribeToOperationStatuses(
+          ids,
+          operationStatusesUpdated
+        );
+      }
+    } else {
+      sendTransaction();
+    }
+  }, [
+    accountCluster,
+    operationSet,
+    virtualNode,
+    operationStatusesUpdated,
+    isOrbyEnabled,
+    sendTransaction,
+  ]);
+
   if (localAddressActionQuery.isSuccess && !localAddressAction) {
     throw new Error('Unexpected missing localAddressAction');
   }
@@ -946,14 +1032,17 @@ function SendTransactionContent({
                   // (important for paymaster flow)
                   wallet={wallet}
                   ref={sendTxBtnRef}
-                  onClick={() => sendTransaction()}
+                  onClick={() => submitTransaction()}
                   isLoading={
-                    sendTransactionMutation.isLoading || OperationSetLoading
+                    sendTransactionMutation.isLoading ||
+                    OperationSetLoading ||
+                    submitTransactionIsLoading
                   }
                   disabled={
                     sendTransactionMutation.isLoading ||
                     OperationSetLoading ||
-                    !!operationSetError
+                    !!operationSetError ||
+                    submitTransactionIsLoading
                   }
                   buttonKind={
                     interpretationHasCriticalWarning ? 'danger' : 'primary'

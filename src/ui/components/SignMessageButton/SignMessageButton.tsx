@@ -45,12 +45,14 @@ export const SignMessageButton = React.forwardRef(function SignMessageButton(
     buttonKind = 'primary',
     onClick,
     holdToSign,
+    submitOperationSetIsLoading,
     ...buttonProps
   }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
     wallet: ExternallyOwnedAccount;
     buttonTitle?: React.ReactNode;
     buttonKind?: ButtonKind;
     holdToSign: boolean | null;
+    submitOperationSetIsLoading?: boolean;
   },
   ref: React.Ref<SignMsgBtnHandle>
 ) {
@@ -169,7 +171,7 @@ export const SignMessageButton = React.forwardRef(function SignMessageButton(
             submittingText="Sending..."
             onClick={handleClick}
             success={isSuccess}
-            submitting={isLoading}
+            submitting={isLoading || submitOperationSetIsLoading}
             disabled={disabled}
             error={isError}
             kind={buttonKind}
@@ -177,7 +179,7 @@ export const SignMessageButton = React.forwardRef(function SignMessageButton(
           />
         ) : (
           <Button
-            disabled={disabled}
+            disabled={disabled || submitOperationSetIsLoading}
             onClick={handleClick}
             kind={buttonKind}
             {...buttonProps}
