@@ -3,6 +3,7 @@ import type { WalletNameFlag } from 'src/shared/types/WalletNameFlag';
 export interface RemoteConfig {
   extension_wallet_name_flags: Record<string, WalletNameFlag[]>;
   extension_uninstall_link: string;
+  one_click_transactions_and_gas_abstraction: boolean;
   extension_loyalty_enabled: boolean;
   extension_asset_page_enabled: boolean;
   fee_comparison_config: Array<{

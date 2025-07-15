@@ -8,6 +8,7 @@ import type { RemoteConfig } from '../types';
 const defaultConfig: RemoteConfig = {
   extension_wallet_name_flags: {},
   extension_uninstall_link: '',
+  one_click_transactions_and_gas_abstraction: false,
   extension_loyalty_enabled: true,
   extension_asset_page_enabled: false,
   loyalty_config: {},
@@ -18,6 +19,7 @@ const defaultConfig: RemoteConfig = {
 const knownKeys: (keyof RemoteConfig)[] = [
   'extension_wallet_name_flags',
   'extension_uninstall_link',
+  'one_click_transactions_and_gas_abstraction',
   'extension_loyalty_enabled',
   'extension_asset_page_enabled',
   'loyalty_config',
