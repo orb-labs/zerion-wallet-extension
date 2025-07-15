@@ -28,6 +28,8 @@ import { DialogButtonValue } from 'src/ui/ui-kit/ModalDialogs/DialogTitle';
 import { Spacer } from 'src/ui/ui-kit/Spacer';
 import { PageBottom } from 'src/ui/components/PageBottom';
 import type { MultichainTransaction } from 'src/shared/types/MultichainTransaction';
+import type { OperationSet } from '@orb-labs/orby-core';
+import { TokenStateSection } from 'src/ui/components/TokenStateSection';
 
 function maybeHexValue(value?: BigNumberish | null): string | null {
   return value ? valueToHex(value) : null;
@@ -205,6 +207,7 @@ export function TransactionAdvancedView({
   interpretation,
   addressAction,
   onCopyData,
+  operationSet,
 }: {
   networks: Networks;
   chain: Chain;
@@ -212,6 +215,7 @@ export function TransactionAdvancedView({
   interpretation?: InterpretResponse | null;
   addressAction: AnyAddressAction;
   onCopyData?: () => void;
+  operationSet?: OperationSet;
 }) {
   const transactionFormatted = useMemo(() => {
     if (transaction.evm) {
@@ -240,6 +244,18 @@ export function TransactionAdvancedView({
           chain={chain}
           networks={networks}
         />
+        {operationSet && (
+          <>
+            <TokenStateSection
+              title="Input Tokens"
+              tokens={operationSet.inputState}
+            />
+            <TokenStateSection
+              title="Output Tokens"
+              tokens={operationSet.outputState}
+            />
+          </>
+        )}
         {transaction.evm ? (
           <TransactionDetails
             networks={networks}
