@@ -27,7 +27,11 @@ import {
   offsetValues,
 } from 'src/ui/pages/Overview/getTabsOffset';
 import { getAddressType } from 'src/shared/wallet/classifiers';
+import { useGetActivity } from '@orb-labs/orby-react';
+import { usePreferences } from 'src/ui/features/preferences';
+import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
 import { ActionsList } from './ActionsList';
+import { ActivityList } from './ActivityList';
 import { ActionSearch } from './ActionSearch';
 import { isMatchForAllWords } from './matchSearcQuery';
 
@@ -195,6 +199,7 @@ export function HistoryList({
   const offsetValuesState = useStore(offsetValues);
   const addressType = getAddressType(address);
   const showNetworkSelector = addressType === 'evm';
+  const { preferences } = usePreferences();
 
   const chainValue = selectedChain || dappChain || NetworkSelectValue.All;
   const chain =
@@ -209,6 +214,12 @@ export function HistoryList({
     fetchMore,
     hasMore,
   } = useMinedAndPendingAddressActions({ chain, searchQuery });
+
+  const { networks } = useNetworks();
+  const chainId = chain ? networks?.getChainId(chain) : undefined;
+  const isOrbyEnabled = useIsOrbyEnabled(chainId ? BigInt(chainId) : undefined);
+
+  const { activity } = useGetActivity(preferences?.testnetMode?.on ?? false);
 
   const actionFilters = (
     <div style={{ paddingInline: 16 }}>
@@ -263,6 +274,13 @@ export function HistoryList({
     <>
       {actionFilters}
       <Spacer height={16} />
+      {isOrbyEnabled && activity?.activities ? (
+        <ActivityList
+          activities={activity?.activities}
+          hasMore={activity?.pageInfo?.hasNextPage}
+          isLoading={false}
+        />
+      ) : undefined}
       <ActionsList
         actions={transactions}
         hasMore={hasMore}
