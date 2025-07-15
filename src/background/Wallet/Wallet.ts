@@ -1302,6 +1302,67 @@ export class Wallet {
     }
   }
 
+  async signTypedData({
+    params: { typedData: rawTypedData },
+  }: WalletMethodParams<{
+    typedData: TypedData | string;
+  }>) {
+    const signer = this.getOfflineSigner();
+    const signature = signTypedData(rawTypedData, signer);
+    return signature;
+  }
+
+  async signTransaction({
+    params,
+  }: WalletMethodParams<[IncomingTransactionAA]>): Promise<string | undefined> {
+    const [incomingTransaction] = params;
+    if (!incomingTransaction.from) {
+      throw new Error(
+        '"from" field is missing from the transaction object. Send from current address?'
+      );
+    }
+    const currentAddress = this.ensureCurrentAddress();
+
+    // TODO(): fix this when we start supporting multiple accounts
+    if (
+      normalizeAddress(incomingTransaction.from) !==
+      normalizeAddress(currentAddress)
+    ) {
+      throw new Error(
+        // TODO?...
+        'transaction "from" field is different from currently selected address'
+      );
+    }
+
+    const chainId = normalizeTransactionChainId(incomingTransaction);
+    const transaction = prepareTransaction(incomingTransaction);
+    const paymasterEligible = Boolean(transaction.customData?.paymasterParams);
+
+    if (paymasterEligible) {
+      try {
+        // const eip712Tx = omit(transaction, ['authorizationList']); // authorizationList can't be part of EIP712 transaction
+        // const { chainId } = eip712Tx;
+        // invariant(chainId, 'ChainId missing from TransactionRequest');
+        // const typedData = createTypedData(eip712Tx);
+        // const signature = await this.signTypedData_v4({
+        //   context,
+        //   params: { typedData },
+        // });
+        // return signature;
+      } catch (error) {
+        throw getEthersError(error);
+      }
+    } else {
+      try {
+        const signer = await this.getSigner(chainId as ChainId);
+        const signature = await signer.signTransaction(transaction);
+        return signature;
+      } catch (error) {
+        throw getEthersError(error);
+      }
+    }
+  }
+
   async signAndSendTransaction({
     params,
     context,
