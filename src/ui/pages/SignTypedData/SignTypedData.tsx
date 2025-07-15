@@ -606,7 +606,6 @@ function SignTypedDataContent({
   invariant(windowId, 'windowId get-parameter is required');
 
   const navigate = useNavigate();
-  // const { preferences } = usePreferences();
 
   const [allowanceQuantityBase, setAllowanceQuantityBase] = useState('');
   const [operationSetError, setOperationSetError] = useState<string | null>(
@@ -652,12 +651,6 @@ function SignTypedDataContent({
     standardizedTokenId: undefined,
     isDefault: true,
   });
-
-  const { accountCluster, baseMainnetClient } = useOrby();
-
-  accountCluster;
-
-  baseMainnetClient;
 
   const gasToken = useMemo(() => {
     return selectedGasToken?.standardizedTokenId
