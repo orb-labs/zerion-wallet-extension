@@ -64,9 +64,26 @@ import {
   SecurityStatusBackground,
 } from 'src/ui/shared/security-check';
 import { INTERNAL_ORIGIN } from 'src/background/constants';
+import {
+  useGetFungibleTokenPortfolio,
+  useGetOperationsToSignTransactionOrSignTypedData,
+} from '@orb-labs/orby-react';
+import {
+  CreateOperationsStatus,
+  type OnchainOperation,
+} from '@orb-labs/orby-core';
+import type { OperationSet, StandardizedBalance } from '@orb-labs/orby-core';
+import type { Client } from 'viem';
+import type { HttpTransport } from 'viem';
+import type { PublicRpcSchema } from 'viem';
+import type { OrbyActions } from '@orb-labs/orby-viem-extension';
+import _ from 'lodash';
+import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
 import { PopoverToast } from '../Settings/PopoverToast';
 import type { PopoverToastHandle } from '../Settings/PopoverToast';
 import { txErrorToMessage } from '../SendTransaction/shared/transactionErrorToMessage';
+import type { GasTokenInput } from '../SendTransaction/NetworkFee/NetworkFee';
+import { GasTokenSelector } from '../SendTransaction/NetworkFee/NetworkFee';
 import { TypedDataAdvancedView } from './TypedDataAdvancedView';
 
 enum View {
@@ -103,6 +120,11 @@ function TypedDataDefaultView({
   onSignSuccess,
   onReject,
   onOpenAdvancedView,
+  operationSetError,
+  selectedGasToken,
+  setSelectedGasToken,
+  fungibleTokens,
+  aggregateFee,
 }: {
   origin: string;
   clientScope: string | null;
@@ -121,11 +143,27 @@ function TypedDataDefaultView({
   onSignSuccess: (signature: string) => void;
   onReject: () => void;
   onOpenAdvancedView: () => void;
+  selectedGasToken?: GasTokenInput;
+  setSelectedGasToken?: (gasToken?: GasTokenInput) => void;
+  operationSet: OperationSet;
+  operations: OnchainOperation[];
+  virtualNode: Client<
+    HttpTransport<undefined, false>,
+    undefined,
+    undefined,
+    PublicRpcSchema,
+    OrbyActions
+  >;
+  isLoadingOperationSet: boolean;
+  operationSetError: string | null;
+  fungibleTokens: StandardizedBalance[];
+  aggregateFee: string;
 }) {
   const toastRef = useRef<PopoverToastHandle>(null);
   const dialogRef = useRef<HTMLDialogElementInterface | null>(null);
   const [params] = useSearchParams();
   const { preferences } = usePreferences();
+  const isOrbyEnabled = useIsOrbyEnabled(BigInt(chain.value));
 
   const addressAction = interpretation?.action;
   const recipientAddress = addressAction?.label?.display_value.wallet_address;
@@ -403,6 +441,18 @@ function TypedDataDefaultView({
       </VStack>
       <Spacer height={16} />
       <Content name="sign-transaction-footer">
+        <HStack gap={8} justifyContent="space-between" alignItems="center">
+          <UIText kind="small/regular">Network Fee</UIText>
+          {selectedGasToken && isOrbyEnabled ? (
+            <GasTokenSelector
+              selectedGasToken={selectedGasToken}
+              setSelectedGasToken={setSelectedGasToken}
+              fungibleTokens={fungibleTokens}
+            />
+          ) : null}
+          <UIText kind="small/regular">{aggregateFee}</UIText>
+        </HStack>
+        <Spacer height={16} />
         <div>
           <VStack
             style={{
@@ -414,6 +464,11 @@ function TypedDataDefaultView({
             {signTypedData_v4Mutation.isError ? (
               <UIText kind="caption/regular" color="var(--negative-500)">
                 {txErrorToMessage(signTypedData_v4Mutation.error)}
+              </UIText>
+            ) : null}
+            {operationSetError ? (
+              <UIText kind="caption/regular" color="var(--negative-500)">
+                {operationSetError}
               </UIText>
             ) : null}
             <div
@@ -486,6 +541,9 @@ function SignTypedDataContent({
   const navigate = useNavigate();
 
   const [allowanceQuantityBase, setAllowanceQuantityBase] = useState('');
+  const [operationSetError, setOperationSetError] = useState<string | null>(
+    null
+  );
 
   const typedData = useMemo(() => {
     const result = toTypedData(typedDataRaw);
@@ -518,7 +576,76 @@ function SignTypedDataContent({
 
   const { networks } = useNetworks(chain ? [chain.toString()] : undefined);
   const chainId = chain && networks ? networks.getChainId(chain) : null;
+  const isOrbyEnabled = useIsOrbyEnabled(chainId ? BigInt(chainId) : undefined);
   const network = chain && networks ? networks.getNetworkByName(chain) : null;
+
+  const [selectedGasToken, setSelectedGasToken] = useState<GasTokenInput>({
+    name: 'no gas',
+    standardizedTokenId: undefined,
+    isDefault: true,
+  });
+
+  const gasToken = useMemo(() => {
+    return selectedGasToken?.standardizedTokenId
+      ? { standardizedTokenId: selectedGasToken.standardizedTokenId }
+      : undefined;
+  }, [selectedGasToken]);
+  const {
+    operations,
+    operationSet,
+    virtualNode,
+    aggregateFee,
+    isLoading: OperationSetLoading,
+  } = useGetOperationsToSignTransactionOrSignTypedData(
+    JSON.stringify(typedData),
+    undefined,
+    undefined,
+    isOrbyEnabled ? wallet.address : undefined,
+    chainId && isOrbyEnabled ? BigInt(chainId) : undefined,
+    gasToken
+  );
+  const { fungibleTokens } = useGetFungibleTokenPortfolio(
+    undefined,
+    chainId && isOrbyEnabled ? BigInt(chainId) : undefined
+  );
+
+  const selectGasToken = useCallback(
+    (gasToken?: GasTokenInput) => {
+      if (gasToken) {
+        setSelectedGasToken(gasToken);
+      }
+    },
+    [setSelectedGasToken]
+  );
+
+  React.useEffect(() => {
+    if (operationSet?.status && isOrbyEnabled) {
+      let errorMessage: string | null = null;
+
+      if (operationSet.status === CreateOperationsStatus.INSUFFICIENT_FUNDS) {
+        errorMessage = 'Insufficient funds';
+      } else if (
+        operationSet.status === CreateOperationsStatus.NO_EXECUTION_PATH
+      ) {
+        errorMessage = 'No execution path';
+      } else if (
+        operationSet.status ===
+        CreateOperationsStatus.INSUFFICIENT_FUNDS_FOR_GAS
+      ) {
+        errorMessage = 'Insufficient funds for gas. Choose another token';
+      } else if (operationSet.status === CreateOperationsStatus.INTERNAL) {
+        errorMessage = 'Internal error';
+      } else if (
+        operationSet.status === CreateOperationsStatus.INVALID_ARGUMENT
+      ) {
+        errorMessage = 'Invalid argument';
+      }
+
+      setOperationSetError(errorMessage);
+    } else {
+      setOperationSetError(null);
+    }
+  }, [operationSet?.status, isOrbyEnabled]);
 
   const { data: interpretation, ...interpretQuery } = useQuery({
     queryKey: [
@@ -582,6 +709,15 @@ function SignTypedDataContent({
             onSignSuccess={handleSignSuccess}
             onOpenAdvancedView={openAdvancedView}
             onReject={handleReject}
+            operationSet={operationSet}
+            operations={operations}
+            virtualNode={virtualNode}
+            isLoadingOperationSet={OperationSetLoading}
+            selectedGasToken={selectedGasToken}
+            setSelectedGasToken={selectGasToken}
+            operationSetError={operationSetError}
+            fungibleTokens={fungibleTokens}
+            aggregateFee={aggregateFee}
           />
         ) : null}
         <CenteredDialog
@@ -593,7 +729,10 @@ function SignTypedDataContent({
                 closeKind="icon"
               />
               {interpretation?.input ? (
-                <TypedDataAdvancedView data={interpretation.input} />
+                <TypedDataAdvancedView
+                  data={interpretation.input}
+                  operationSet={operationSet}
+                />
               ) : null}
             </>
           )}
