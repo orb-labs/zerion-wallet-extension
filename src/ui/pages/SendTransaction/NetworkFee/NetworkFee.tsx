@@ -15,9 +15,26 @@ import type { IncomingTransactionWithFrom } from 'src/modules/ethereum/types/Inc
 import { useNetworks } from 'src/modules/networks/useNetworks';
 import { useCurrency } from 'src/modules/currency/useCurrency';
 import { formatCurrencyValueExtra } from 'src/shared/units/formatCurrencyValue';
+import type { StandardizedBalance } from '@orb-labs/orby-core';
+import { TokenIcon } from 'src/ui/ui-kit/TokenIcon';
+import { BottomSheetDialog } from 'src/ui/ui-kit/ModalDialogs/BottomSheetDialog';
+import { DialogTitle } from 'src/ui/ui-kit/ModalDialogs/DialogTitle';
+import { SurfaceList } from 'src/ui/ui-kit/SurfaceList';
+import { VStack } from 'src/ui/ui-kit/VStack';
+import { createPortal } from 'react-dom';
+import { getRootDomNode } from 'src/ui/shared/getRootDomNode';
+import DownIcon from 'jsx:src/ui/assets/chevron-down.svg';
+import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
 import type { TransactionFee } from '../TransactionConfiguration/useTransactionFee';
-import { NetworkFeeDialog } from './NetworkFeeDialog';
 import { NETWORK_SPEED_TO_TITLE } from './constants';
+import { NetworkFeeDialog } from './NetworkFeeDialog';
+
+export interface GasTokenInput {
+  name: string;
+  standardizedTokenId?: string;
+  isDefault: boolean;
+  url?: string;
+}
 
 function getFeeTypeTitle(
   type: Exclude<keyof ChainGasPrice['fast'], 'eta'> | undefined
@@ -32,6 +49,128 @@ function getFeeTypeTitle(
   return labels[type];
 }
 
+export function GasTokenSelector({
+  selectedGasToken,
+  setSelectedGasToken,
+  fungibleTokens,
+}: {
+  selectedGasToken?: GasTokenInput;
+  setSelectedGasToken?: (gasToken?: GasTokenInput) => void;
+  fungibleTokens?: StandardizedBalance[] | undefined;
+}) {
+  const dialogRef = useRef<HTMLDialogElementInterface | null>(null);
+  const rootNode = getRootDomNode();
+
+  const handleSelectGasToken = (token: StandardizedBalance) => {
+    const gasToken: GasTokenInput = {
+      name: token.total.currency.symbol,
+      standardizedTokenId: token.standardizedTokenId,
+      isDefault: false,
+      url: token.total.currency.logoUrl,
+    };
+    setSelectedGasToken?.(gasToken);
+    dialogRef.current?.close();
+  };
+
+  const handleSelectDefault = () => {
+    setSelectedGasToken?.({
+      name: 'Native Token',
+      standardizedTokenId: undefined,
+      isDefault: true,
+    });
+    dialogRef.current?.close();
+  };
+
+  const items = [
+    {
+      key: 'default',
+      component: (
+        <HStack gap={8} alignItems="center">
+          <TokenIcon
+            size={20}
+            src={undefined}
+            symbol="No Gas Abstraction"
+            title="No Gas Abstraction"
+          />
+          <UIText kind="body/regular">No Gas Abstraction</UIText>
+        </HStack>
+      ),
+      onClick: handleSelectDefault,
+      isInteractive: true,
+    },
+    ...(fungibleTokens
+      ? fungibleTokens.map((token, index) => ({
+          key: token.standardizedTokenId || `token-${index}`,
+          component: (
+            <HStack gap={8} alignItems="center">
+              <TokenIcon
+                size={20}
+                src={token.total.currency.logoUrl}
+                symbol={token.total.currency.symbol}
+                title={token.total.currency.symbol}
+              />
+              <UIText kind="body/regular">{token.total.currency.symbol}</UIText>
+            </HStack>
+          ),
+          onClick: () => handleSelectGasToken(token),
+          isInteractive: true,
+        }))
+      : []),
+  ];
+
+  return (
+    <>
+      {createPortal(
+        <BottomSheetDialog
+          ref={dialogRef}
+          height="70vh"
+          containerStyle={{ paddingTop: 16 }}
+        >
+          <DialogTitle
+            title={<UIText kind="headline/h3">Select Gas Token</UIText>}
+            alignTitle="start"
+          />
+          <VStack gap={8} style={{ marginTop: 16 }}>
+            <SurfaceList items={items} />
+          </VStack>
+        </BottomSheetDialog>,
+        rootNode
+      )}
+
+      <UnstyledButton
+        type="button"
+        className={helperStyles.hoverUnderline}
+        style={{
+          color: 'var(--primary)',
+          cursor: 'pointer',
+        }}
+        onClick={() => {
+          dialogRef.current?.showModal();
+        }}
+      >
+        <HStack gap={8} alignItems="center">
+          <TokenIcon
+            size={16}
+            src={selectedGasToken?.url}
+            symbol={selectedGasToken?.name || 'TOKEN'}
+            title={selectedGasToken?.name}
+          />
+          <UIText kind="small/accent">
+            {selectedGasToken?.name || 'Select Token'}
+          </UIText>
+          <DownIcon
+            width={16}
+            height={16}
+            style={{
+              color: 'var(--primary)',
+            }}
+          />
+        </HStack>
+      </UnstyledButton>
+    </>
+  );
+}
+
 export function NetworkFee({
   transaction,
   transactionFee,
@@ -43,6 +182,9 @@ export function NetworkFee({
   label,
   renderDisplayValue,
   displayValueEnd,
+  selectedGasToken,
+  setSelectedGasToken,
+  fungibleTokens,
 }: {
   transaction: IncomingTransactionWithFrom;
   transactionFee: TransactionFee;
@@ -57,9 +199,15 @@ export function NetworkFee({
     displayValue: string;
   }) => React.ReactNode;
   displayValueEnd?: React.ReactNode;
+  selectedGasToken?: GasTokenInput;
+  setSelectedGasToken?: (gasToken?: GasTokenInput) => void;
+  fungibleTokens?: StandardizedBalance[] | undefined;
 }) {
   const { networks } = useNetworks();
   const { currency } = useCurrency();
+  const isOrbyEnabled = useIsOrbyEnabled(
+    transaction.chainId ? BigInt(transaction.chainId) : undefined
+  );
   const dialogRef = useRef<HTMLDialogElementInterface | null>(null);
   const { time, feeEstimation, feeEstimationQuery, costs, costsQuery } =
     transactionFee;
@@ -138,6 +286,13 @@ export function NetworkFee({
         ) : (
           <UIText kind="small/regular">Network Fee</UIText>
         )}
+        {selectedGasToken && isOrbyEnabled ? (
+          <GasTokenSelector
+            selectedGasToken={selectedGasToken}
+            setSelectedGasToken={setSelectedGasToken}
+            fungibleTokens={fungibleTokens}
+          />
+        ) : null}
         {isLoading ? (
           <CircleSpinner />
         ) : displayValue ? (
