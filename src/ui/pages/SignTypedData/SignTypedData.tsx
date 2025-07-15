@@ -601,7 +601,6 @@ function SignTypedDataContent({
   invariant(windowId, 'windowId get-parameter is required');
 
   const navigate = useNavigate();
-  // const { preferences } = usePreferences();
 
   const [allowanceQuantityBase, setAllowanceQuantityBase] = useState('');
 
