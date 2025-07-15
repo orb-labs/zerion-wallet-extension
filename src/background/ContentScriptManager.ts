@@ -3,10 +3,16 @@ import { createNanoEvents } from 'nanoevents';
 import { produce } from 'immer';
 import { isTruthy } from 'is-truthy-ts';
 import { difference } from 'src/shared/difference';
+import { unifyBalancesOnApps } from '@orb-labs/orby-core-mini';
 import {
   globalPreferences,
   type GlobalPreferences,
 } from './Wallet/GlobalPreferences';
+
+unifyBalancesOnApps(
+  '/content-script/',
+  `${process.env.ORBY_BASE_URL}/${process.env.ORBY_PRIVATE_API_KEY}`
+);
 
 function setActiveIcon({ tabId }: { tabId?: number }) {
   if (process.env.NODE_ENV === 'development') {
@@ -193,13 +199,16 @@ export class ContentScriptManager {
     if (!matches) {
       return; // do not registerContentScripts at all
     }
+
     // Register script with "world: 'MAIN'" environment so that it can write to page window
     // See: https://developer.chrome.com/docs/extensions/mv3/content_scripts/#isolated_world
     await chrome.scripting.registerContentScripts([
       {
         id: 'zerion-extension-content-script',
         allFrames: true,
-        js: inPageScriptLocation.resources,
+        js: inPageScriptLocation.resources.filter(
+          (r) => r !== 'webpage.js' && r !== 'content-script/webpage.js'
+        ),
         excludeMatches,
         matches,
         world: 'MAIN',

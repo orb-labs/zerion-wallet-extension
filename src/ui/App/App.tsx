@@ -1,6 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { AreaProvider } from 'react-area';
-import { QueryClientProvider, useQuery } from '@tanstack/react-query';
+import {
+  QueryClientProvider,
+  useMutation,
+  useQuery,
+} from '@tanstack/react-query';
 import {
   HashRouter as Router,
   Routes,
@@ -23,8 +27,14 @@ import { SignTypedData } from 'src/ui/pages/SignTypedData';
 import { useStore } from '@store-unit/react';
 import { runtimeStore } from 'src/shared/core/runtime-store';
 import { useDefiSdkClient } from 'src/modules/defi-sdk/useDefiSdkClient';
-import { OrbyProvider } from '@orb-labs/orby-react';
+import {
+  OrbyProvider,
+  useBulkConnectAppSessions,
+  useOrby,
+} from '@orb-labs/orby-react';
+import { getPermissionsWithWallets } from 'src/ui/shared/requests/getPermissionsWithWallets';
 import { Account, AccountType, VMType } from '@orb-labs/orby-core';
+import { useIsOneClickTransactionsAndGasAbstractionEnabled } from 'src/shared/core/useIsOneClickTransactionsAndGasAbstractionEnabled';
 import { Login } from '../pages/Login';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import {
@@ -85,6 +95,7 @@ import { Invite } from '../features/referral-program';
 import { XpDrop } from '../features/xp-drop';
 import { BridgeForm } from '../pages/BridgeForm';
 import { TurnstileTokenHandler } from '../features/turnstile';
+import type { ConnectedSiteItem } from '../shared/requests/getPermissionsWithWallets';
 import { RouteRestoration, registerPersistentRoute } from './RouteRestoration';
 
 const isProd = process.env.NODE_ENV === 'production';
@@ -470,6 +481,56 @@ function GlobalKeyboardShortcuts() {
   );
 }
 
+function RegisterSessions() {
+  const { data: allConnectedSites, isFetching } = useQuery({
+    queryKey: ['getPermissionsWithWallets'],
+    queryFn: getPermissionsWithWallets,
+    useErrorBoundary: false,
+    suspense: false,
+  });
+
+  const { getVirtualNodeRpcUrlsForSupportedChains } = useOrby();
+  const activeSessions = React.useMemo(() => {
+    if (isFetching || !allConnectedSites) {
+      return [];
+    }
+
+    return allConnectedSites?.map(
+      ({ origin, addresses }: ConnectedSiteItem) => {
+        return { host: origin, address: addresses[0] as `0x${string}` };
+      }
+    );
+  }, [allConnectedSites, isFetching]);
+
+  const virtualNodeUrls = useMemo(() => {
+    return getVirtualNodeRpcUrlsForSupportedChains()?.map((virtualNodeUrl) => {
+      return {
+        rpcUrl: virtualNodeUrl.virtualNodeRpcUrl,
+        chainId: Number(virtualNodeUrl.chainId),
+      };
+    });
+  }, [getVirtualNodeRpcUrlsForSupportedChains]);
+
+  const addVirtualNodesMutation = useMutation({
+    mutationFn: async () => {
+      await walletPort.request('addVirtualNodes', { virtualNodeUrls });
+    },
+  });
+
+  // Only trigger the mutation when virtualNodeUrls reference changes
+  const previousVirtualNodeUrlsRef = React.useRef(virtualNodeUrls);
+
+  useEffect(() => {
+    if (previousVirtualNodeUrlsRef.current !== virtualNodeUrls) {
+      addVirtualNodesMutation.mutate();
+      previousVirtualNodeUrlsRef.current = virtualNodeUrls;
+    }
+  }, [virtualNodeUrls, addVirtualNodesMutation]);
+
+  useBulkConnectAppSessions(activeSessions);
+  return <></>;
+}
+
 export interface AppProps {
   initialView?: 'handshakeFailure';
   inspect?: { message: string };
@@ -508,11 +569,17 @@ export function InnerApp({ initialView, inspect }: AppProps) {
     };
   }, [wallet]);
 
+  const oneClickTransactionsAndGasAbstractionEnabled =
+    useIsOneClickTransactionsAndGasAbstractionEnabled();
+
   return (
     <>
       <OrbyProvider config={orbyConfig}>
         <Router>
           <ErrorBoundary renderError={(error) => <ViewError error={error} />}>
+            {oneClickTransactionsAndGasAbstractionEnabled && (
+              <RegisterSessions />
+            )}
             <InactivityDetector />
             <SessionResetHandler />
             <TurnstileTokenHandler />
