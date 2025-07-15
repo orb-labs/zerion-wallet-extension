@@ -45,14 +45,21 @@
   "content_scripts": [
     {
       "all_frames": true,
-      "js": ["content-script/index.ts"],
+      "js": [
+        "content-script/core-webpage-injector.js",
+        "content-script/index.ts"
+      ],
       "matches": ["https://*/*", "http://localhost/*", "http://0.0.0.0/*"],
       "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["content-script/in-page.ts"],
+      "resources": [
+        "content-script/in-page.ts",
+        "content-script/webpage.js",
+        "content-script/core-webpage.js"
+      ],
       "matches": ["<all_urls>"]
     }
   ],
@@ -62,7 +69,8 @@
     "scripting",
     "sidePanel",
     "storage",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "tabs"
   ],
   "host_permissions": ["http://*/*", "https://*/*"]
 }
