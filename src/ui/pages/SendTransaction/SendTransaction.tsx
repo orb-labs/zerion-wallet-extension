@@ -100,10 +100,16 @@ import ArrowDownIcon from 'jsx:src/ui/assets/caret-down-filled.svg';
 import { SiteFaviconImg } from 'src/ui/components/SiteFaviconImg';
 import { NetworkId } from 'src/modules/networks/NetworkId';
 import {
+  useGetFungibleTokenPortfolio,
   useGetOperationsToExecuteTransaction,
+  useGetOperationsToSignTransactionOrSignTypedData,
   useOrby,
 } from '@orb-labs/orby-react';
-import type { OperationStatus } from '@orb-labs/orby-core';
+import type {
+  OperationSet,
+  OperationStatus,
+  StandardizedBalance,
+} from '@orb-labs/orby-core';
 import {
   CreateOperationsStatus,
   OperationStatusType,
@@ -1116,6 +1122,9 @@ function SolDefaultView({
   origin,
   wallet,
   networks,
+  operationSet,
+  selectedGasToken,
+  selectGasToken,
 }: {
   origin: string;
   addressAction: AnyAddressAction;
@@ -1123,12 +1132,25 @@ function SolDefaultView({
   txInterpretQuery: ReturnType<typeof useInterpretTxBasedOnEligibility>;
   wallet: ExternallyOwnedAccount;
   networks: Networks;
+  operationSet: OperationSet;
+  selectedGasToken: GasTokenInput;
+  selectGasToken: (gasToken?: GasTokenInput) => void;
+  fungibleTokens?: StandardizedBalance[] | undefined;
 }) {
   const originForHref = useMemo(() => prepareForHref(origin), [origin]);
 
   const recipientAddress = addressAction.label?.display_value.wallet_address;
   const actionTransfers = addressAction.content?.transfers;
   const singleAsset = addressAction?.content?.single_asset;
+
+  const chainId = addressAction.transaction.chain
+    ? networks?.getChainId(createChain(addressAction.transaction.chain))
+    : undefined;
+  const isOrbyEnabled = useIsOrbyEnabled(chainId ? BigInt(chainId) : undefined);
+  const { fungibleTokens } = useGetFungibleTokenPortfolio(
+    undefined,
+    chainId && isOrbyEnabled ? BigInt(chainId) : undefined
+  );
 
   const advancedDialogRef = useRef<HTMLDialogElementInterface | null>(null);
 
@@ -1240,6 +1262,9 @@ function SolDefaultView({
             chain={addressAction.transaction.chain}
             networkFee={addressAction.transaction.fee}
             isLoading={txInterpretQuery.isLoading}
+            selectedGasToken={selectedGasToken}
+            selectGasToken={selectGasToken}
+            fungibleTokens={fungibleTokens}
           />
         ) : null}
       </div>
@@ -1260,7 +1285,7 @@ function SolDefaultView({
               transaction={{ solana: rawTransaction }}
               addressAction={addressAction}
               onCopyData={() => toastRef.current?.showToast()}
-              operationSet={undefined}
+              operationSet={operationSet}
             />
           </>
         )}
@@ -1344,9 +1369,28 @@ function SolSendTransaction() {
   invariant(wallet, 'Wallet must be available');
   const { preferences } = usePreferences();
   const sendTxBtnRef = useRef<SendTxBtnHandle | null>(null);
+  const { accountCluster } = useOrby();
+  const isOrbyEnabled = useIsOrbyEnabled(BigInt(101));
+  const [submitOperationSetIsLoading, setSubmitOperationSetIsLoading] =
+    useState(false);
+  const [operationSetError, setOperationSetError] = useState<string | null>(
+    null
+  );
 
   const navigate = useNavigate();
   const next = params.get('next');
+
+  const [selectedGasToken, setSelectedGasToken] = useState<GasTokenInput>({
+    name: 'no gas',
+    standardizedTokenId: undefined,
+    isDefault: true,
+  });
+
+  const gasToken = useMemo(() => {
+    return selectedGasToken?.standardizedTokenId
+      ? { standardizedTokenId: selectedGasToken.standardizedTokenId }
+      : undefined;
+  }, [selectedGasToken]);
 
   async function handleSentTransaction(res: SignTransactionResult) {
     if (preferences?.enableHoldToSignButton) {
@@ -1379,6 +1423,58 @@ function SolSendTransaction() {
     () => parseSolanaTransaction(wallet.address, solFromBase64(firstTx)),
     [firstTx, wallet.address]
   );
+
+  const {
+    operationSet,
+    virtualNode,
+    isLoading: OperationSetLoading,
+  } = useGetOperationsToSignTransactionOrSignTypedData(
+    firstTx,
+    undefined,
+    undefined,
+    isOrbyEnabled ? wallet.address : undefined,
+    BigInt(101),
+    gasToken,
+    new Map([['method', txParams.method]])
+  );
+
+  const selectGasToken = useCallback(
+    (gasToken?: GasTokenInput) => {
+      if (gasToken) {
+        setSelectedGasToken(gasToken);
+      }
+    },
+    [setSelectedGasToken]
+  );
+
+  React.useEffect(() => {
+    if (operationSet?.status && isOrbyEnabled) {
+      let errorMessage: string | null = null;
+
+      if (operationSet.status === CreateOperationsStatus.INSUFFICIENT_FUNDS) {
+        errorMessage = 'Insufficient funds';
+      } else if (
+        operationSet.status === CreateOperationsStatus.NO_EXECUTION_PATH
+      ) {
+        errorMessage = 'No execution path';
+      } else if (
+        operationSet.status ===
+        CreateOperationsStatus.INSUFFICIENT_FUNDS_FOR_GAS
+      ) {
+        errorMessage = 'Insufficient funds for gas. Choose another token';
+      } else if (operationSet.status === CreateOperationsStatus.INTERNAL) {
+        errorMessage = 'Internal error';
+      } else if (
+        operationSet.status === CreateOperationsStatus.INVALID_ARGUMENT
+      ) {
+        errorMessage = 'Invalid argument';
+      }
+
+      setOperationSetError(errorMessage);
+    } else {
+      setOperationSetError(null);
+    }
+  }, [operationSet?.status, isOrbyEnabled]);
 
   // TODO: support multiple transactions in simulation
   const interpretQuery = useQuery({
@@ -1442,6 +1538,73 @@ function SolSendTransaction() {
     onSuccess: (tx) => handleSentTransaction(tx),
   });
 
+  const operationStatusesUpdated = useCallback(
+    async (
+      statusSummary: OperationStatusType,
+      finalTransactionStatus?: OperationStatus,
+      _statuses?: OperationStatus[]
+    ) => {
+      if (
+        [OperationStatusType.SUCCESSFUL, OperationStatusType.PENDING].includes(
+          statusSummary
+        )
+      ) {
+        if (txParams.method === 'signAndSendTransaction') {
+          handleSentTransaction({
+            solana: {
+              signature: finalTransactionStatus?.hash as string,
+              publicKey: wallet.address,
+              tx: firstTx,
+            },
+          });
+        } else {
+          sendTransaction();
+        }
+
+        setSubmitOperationSetIsLoading(false);
+      }
+    },
+    [
+      firstTx,
+      handleSentTransaction,
+      sendTransaction,
+      txParams.method,
+      wallet.address,
+    ]
+  );
+
+  const submitTransaction = useCallback(async () => {
+    if (isOrbyEnabled) {
+      if (accountCluster && virtualNode && virtualNode) {
+        setSubmitOperationSetIsLoading(true);
+        const { operationResponses } = await virtualNode.sendOperationSet(
+          accountCluster,
+          operationSet,
+          signTransaction,
+          signUserOperation,
+          signTypedData
+        );
+
+        const ids = operationResponses
+          ?.map((op) => op.id)
+          .filter((id) => !_.isUndefined(id));
+        virtualNode?.subscribeToOperationStatuses(
+          ids,
+          operationStatusesUpdated
+        );
+      }
+    } else {
+      sendTransaction();
+    }
+  }, [
+    accountCluster,
+    operationSet,
+    virtualNode,
+    operationStatusesUpdated,
+    isOrbyEnabled,
+    sendTransaction,
+  ]);
+
   useBackgroundKind(whiteBackgroundKind);
 
   return (
@@ -1461,6 +1624,9 @@ function SolSendTransaction() {
             txInterpretQuery={interpretQuery}
             origin={origin}
             networks={networks}
+            operationSet={operationSet}
+            selectedGasToken={selectedGasToken}
+            selectGasToken={selectGasToken}
           />
         ) : null}
         <Spacer height={16} />
@@ -1471,6 +1637,11 @@ function SolSendTransaction() {
           {sendTransactionMutation.isError ? (
             <UIText kind="body/regular" color="var(--negative-500)">
               {txErrorToMessage(sendTransactionMutation.error)}
+            </UIText>
+          ) : null}
+          {operationSetError ? (
+            <UIText kind="body/regular" color="var(--negative-500)">
+              {operationSetError}
             </UIText>
           ) : null}
           <div
@@ -1488,9 +1659,17 @@ function SolSendTransaction() {
               <SignTransactionButton
                 wallet={wallet}
                 ref={sendTxBtnRef}
-                onClick={() => sendTransaction()}
-                isLoading={sendTransactionMutation.isLoading}
-                disabled={sendTransactionMutation.isLoading}
+                onClick={() => submitTransaction()}
+                isLoading={
+                  sendTransactionMutation.isLoading ||
+                  OperationSetLoading ||
+                  submitOperationSetIsLoading
+                }
+                disabled={
+                  sendTransactionMutation.isLoading ||
+                  OperationSetLoading ||
+                  submitOperationSetIsLoading
+                }
                 buttonKind="primary"
                 holdToSign={preferences.enableHoldToSignButton}
               />

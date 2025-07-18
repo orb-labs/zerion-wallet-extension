@@ -33,8 +33,14 @@ import {
   useOrby,
 } from '@orb-labs/orby-react';
 import { getPermissionsWithWallets } from 'src/ui/shared/requests/getPermissionsWithWallets';
-import { Account, AccountType, VMType } from '@orb-labs/orby-core';
+import type { VMType } from '@orb-labs/orby-core';
+import {
+  Account,
+  AccountType,
+  validateAndFormatAddress,
+} from '@orb-labs/orby-core';
 import { useIsOneClickTransactionsAndGasAbstractionEnabled } from 'src/shared/core/useIsOneClickTransactionsAndGasAbstractionEnabled';
+import { getWalletVirtualEnvironment } from 'src/shared/core/orb';
 import { Login } from '../pages/Login';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import {
@@ -552,9 +558,9 @@ export function InnerApp({ initialView, inspect }: AppProps) {
     const accounts = wallet
       ? [
           new Account(
-            wallet?.address?.toLowerCase(),
+            validateAndFormatAddress(wallet?.address),
             AccountType.EOA,
-            VMType.EVM,
+            getWalletVirtualEnvironment(wallet?.address) as VMType,
             undefined
           ),
         ]
