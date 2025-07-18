@@ -7,13 +7,15 @@ import { useOperationSetError } from './useOperationSetError';
 
 export function useOrbyGetOperationsToSignTransactionOrSignTypedData(
   transaction: {
-    evm: IncomingTransactionWithChainId | undefined;
-    typedData: string | undefined;
+    evm?: IncomingTransactionWithChainId | undefined;
+    solana?: string | undefined;
+    typedData?: string | undefined;
   },
-  wallet: ExternallyOwnedAccount,
+  wallet: ExternallyOwnedAccount | undefined,
   isOrbyEnabled: boolean | undefined,
   selectedGasToken: GasTokenInput | undefined,
-  chainId: bigint | undefined
+  chainId: bigint | undefined,
+  options?: Map<string, any>
 ) {
   const gasToken = useMemo(() => {
     return selectedGasToken?.standardizedTokenId
@@ -31,6 +33,13 @@ export function useOrbyGetOperationsToSignTransactionOrSignTypedData(
         value: transaction.evm?.value
           ? BigInt(transaction.evm?.value?.toString())
           : undefined,
+        entrypointAccountAddress: wallet?.address as string,
+        chainId,
+        gasToken,
+      };
+    } else if (transaction.solana) {
+      return {
+        data: transaction.solana as string,
         entrypointAccountAddress: wallet?.address as string,
         chainId,
         gasToken,
@@ -59,7 +68,8 @@ export function useOrbyGetOperationsToSignTransactionOrSignTypedData(
     orbyParams?.value,
     orbyParams?.entrypointAccountAddress,
     orbyParams?.chainId,
-    orbyParams.gasToken
+    orbyParams?.gasToken,
+    options
   );
 
   const operationSetError = useOperationSetError(operationSet, isOrbyEnabled);

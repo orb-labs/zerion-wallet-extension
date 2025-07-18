@@ -36,9 +36,10 @@ import { getFungibleAsset } from 'src/modules/ethereum/transactions/actionAsset'
 import { useGetFungibleTokenPortfolio } from '@orb-labs/orby-react';
 import type { StandardizedBalance } from '@orb-labs/orby-core';
 import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
+import { useNetworks } from 'src/modules/networks/useNetworks';
 import { NetworkFee } from '../NetworkFee';
 import { NonceLine } from '../NonceLine';
-import type { GasTokenInput } from '../NetworkFee/NetworkFee';
+import { GasTokenSelector, type GasTokenInput } from '../NetworkFee/NetworkFee';
 import { useTransactionFee } from './useTransactionFee';
 
 export function GasbackHint() {
@@ -127,11 +128,17 @@ export function AddressActionNetworkFee({
   networkFee,
   chain,
   isLoading,
+  selectedGasToken,
+  selectGasToken,
+  fungibleTokens,
 }: {
   label?: React.ReactNode;
   networkFee: NonNullable<AddressAction['transaction']['fee']>;
   isLoading: boolean;
   chain: string;
+  selectedGasToken?: GasTokenInput;
+  selectGasToken?: (gasToken?: GasTokenInput) => void;
+  fungibleTokens?: StandardizedBalance[] | undefined;
 }) {
   const { currency } = useCurrency();
   const { asset, fiatCost, assetCost } = useMemo(() => {
@@ -149,6 +156,11 @@ export function AddressActionNetworkFee({
     return { asset, fiatCost, assetCost };
   }, [chain, networkFee.asset, networkFee.quantity]);
 
+  const { networks } = useNetworks();
+  const chainId =
+    chain == 'solana' ? BigInt(101) : networks?.getChainId(createChain(chain));
+  const isOrbyEnabled = useIsOrbyEnabled(chainId ? BigInt(chainId) : undefined);
+
   if (!fiatCost && !assetCost) {
     return null;
   }
@@ -160,6 +172,13 @@ export function AddressActionNetworkFee({
       ) : (
         <UIText kind="small/regular">Network Fee</UIText>
       )}
+      {selectedGasToken && isOrbyEnabled ? (
+        <GasTokenSelector
+          selectedGasToken={selectedGasToken}
+          setSelectedGasToken={selectGasToken}
+          fungibleTokens={fungibleTokens}
+        />
+      ) : null}
 
       <UIText kind="small/accent">
         <HStack gap={8} alignItems="center">
