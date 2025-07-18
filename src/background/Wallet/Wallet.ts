@@ -1363,6 +1363,21 @@ export class Wallet {
     }
   }
 
+  async signSVMTransaction({
+    params,
+  }: WalletMethodParams<{
+    transaction: StringBase64;
+  }>): Promise<SolSignTransactionResult> {
+    this.ensureRecord(this.record);
+    const currentAddress = this.ensureCurrentAddress();
+    const transaction = solFromBase64(params.transaction);
+
+    const keypair = this.getKeypairByAddress(currentAddress);
+    const result = SolanaSigning.signTransaction(transaction, keypair);
+
+    return result;
+  }
+
   async signAndSendTransaction({
     params,
     context,
