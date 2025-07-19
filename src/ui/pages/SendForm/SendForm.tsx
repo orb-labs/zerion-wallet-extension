@@ -1,4 +1,4 @@
-import React, { useCallback, useId, useMemo, useRef } from 'react';
+import React, { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { hashQueryKey, useMutation, useQuery } from '@tanstack/react-query';
 import type { AddressAction, AddressPosition } from 'defi-sdk';
@@ -30,7 +30,10 @@ import type { HTMLDialogElementInterface } from 'src/ui/ui-kit/ModalDialogs/HTML
 import { WalletAvatar } from 'src/ui/components/WalletAvatar';
 import { NavigationTitle } from 'src/ui/components/NavigationTitle';
 import { UnstyledLink } from 'src/ui/ui-kit/UnstyledLink';
-import { useNetworkConfig } from 'src/modules/networks/useNetworks';
+import {
+  useNetworkConfig,
+  useNetworks,
+} from 'src/modules/networks/useNetworks';
 import { getRootDomNode } from 'src/ui/shared/getRootDomNode';
 import { usePreferences } from 'src/ui/features/preferences/usePreferences';
 import { ViewLoadingSuspense } from 'src/ui/components/ViewLoading/ViewLoading';
@@ -55,10 +58,25 @@ import { Networks } from 'src/modules/networks/Networks';
 import { useSearchParamsObj } from 'src/ui/shared/forms/useSearchParamsObj';
 import { getDefaultChain } from 'src/ui/shared/forms/trading/getDefaultChain';
 import { isMatchForEcosystem } from 'src/shared/wallet/shared';
+import {
+  useGetOperationsToSignTransactionOrSignTypedData,
+  useOrby,
+} from '@orb-labs/orby-react';
+import type { OperationStatus } from '@orb-labs/orby-core';
+import { OperationStatusType } from '@orb-labs/orby-core';
+import {
+  signTransaction,
+  signTypedData,
+  signUserOperation,
+} from 'src/shared/core/orb';
+import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
+import { useOperationSetError } from 'src/ui/shared/hooks/useOperationSetError';
+import _ from 'lodash';
 import { TransactionConfiguration } from '../SendTransaction/TransactionConfiguration';
 import { NetworkSelect } from '../Networks/NetworkSelect';
 import { txErrorToMessage } from '../SendTransaction/shared/transactionErrorToMessage';
 import { NetworkFeeLineInfo } from '../SendTransaction/TransactionConfiguration/TransactionConfiguration';
+import type { GasTokenInput } from '../SendTransaction/NetworkFee/NetworkFee';
 import { SuccessState } from './SuccessState';
 import { AddressInputWrapper } from './fieldsets/AddressInput';
 import { updateRecentAddresses } from './fieldsets/AddressInput/updateRecentAddresses';
@@ -103,6 +121,14 @@ function SendFormComponent() {
   const { preferences, setPreferences } = usePreferences();
   const { innerHeight } = useWindowSizeStore();
 
+  const [submitOperationSetIsLoading, setSubmitOperationSetIsLoading] =
+    useState(false);
+  const [submitOperationSuccessful, setSubmitOperationSuccessful] =
+    useState(false);
+  const [
+    submitOperationFinalOperationStatus,
+    setSubmitOperationFinalOperationStatus,
+  ] = useState<OperationStatus | undefined>(undefined);
   const [userFormState, setUserFormState] = useSearchParamsObj<SendFormState>();
 
   const handleChange = useCallback(
@@ -168,6 +194,31 @@ function SendFormComponent() {
 
   const formId = useId();
   const client = useDefiSdkClient();
+
+  const { accountCluster } = useOrby();
+  const { networks } = useNetworks(chain ? [chain.toString()] : undefined);
+
+  const chainId = useMemo(() => {
+    const id =
+      chain?.value == 'solana'
+        ? 101
+        : chain && networks
+        ? networks.getChainId(chain)
+        : null;
+
+    if (id) {
+      return BigInt(id);
+    }
+    return undefined;
+  }, [chain, networks]);
+
+  const isOrbyEnabled = useIsOrbyEnabled(chainId);
+
+  const [selectedGasToken, setSelectedGasToken] = useState<GasTokenInput>({
+    name: 'Native Token',
+    standardizedTokenId: undefined,
+    isDefault: true,
+  });
 
   const { data: sendData, ...sendDataQuery } = useQuery({
     suspense: false,
@@ -275,16 +326,134 @@ function SendFormComponent() {
     [addressType]
   );
 
-  if (sendTxMutation.isSuccess) {
-    const result = sendTxMutation.data;
-    invariant(result, 'Missing Form State View values');
+  const gasToken = useMemo(() => {
+    return selectedGasToken?.standardizedTokenId
+      ? { standardizedTokenId: selectedGasToken.standardizedTokenId }
+      : undefined;
+  }, [selectedGasToken]);
+
+  const orbyParams = useMemo(() => {
+    if (!isOrbyEnabled) {
+      return { data: '0x' };
+    } else if (sendData?.transaction?.evm) {
+      return {
+        data: sendData?.transaction?.evm?.data as string,
+        to: sendData?.transaction?.evm?.to as string,
+        value: sendData?.transaction?.evm?.value
+          ? BigInt(sendData?.transaction?.evm?.value?.toString())
+          : undefined,
+        entrypointAccountAddress: wallet?.address as string,
+        chainId,
+        gasToken,
+      };
+    } else if (sendData?.transaction?.solana) {
+      return {
+        data: sendData?.transaction?.solana as string,
+        entrypointAccountAddress: wallet?.address as string,
+        chainId: BigInt(101),
+        gasToken,
+      };
+    } else {
+      return { data: '0x' };
+    }
+  }, [sendData, isOrbyEnabled, chainId, wallet, gasToken]);
+
+  const {
+    operationSet,
+    virtualNode,
+    isLoading: OperationSetLoading,
+  } = useGetOperationsToSignTransactionOrSignTypedData(
+    orbyParams?.data,
+    orbyParams?.to,
+    orbyParams?.value,
+    orbyParams?.entrypointAccountAddress,
+    orbyParams?.chainId,
+    orbyParams.gasToken
+  );
+
+  const operationSetError = useOperationSetError(operationSet, isOrbyEnabled);
+
+  const selectGasToken = useCallback(
+    (gasToken?: GasTokenInput) => {
+      if (gasToken) {
+        setSelectedGasToken(gasToken);
+      }
+    },
+    [setSelectedGasToken]
+  );
+  const operationStatusesUpdated = useCallback(
+    async (
+      statusSummary: OperationStatusType,
+      finalTransactionStatus?: OperationStatus,
+      _statuses?: OperationStatus[]
+    ) => {
+      if (
+        [OperationStatusType.SUCCESSFUL, OperationStatusType.PENDING].includes(
+          statusSummary
+        )
+      ) {
+        setSubmitOperationSetIsLoading(false);
+        setSubmitOperationSuccessful(true);
+        setSubmitOperationFinalOperationStatus(finalTransactionStatus);
+      }
+    },
+    []
+  );
+
+  const submitTransaction = useCallback(
+    async (interpretationAction: AddressAction | null) => {
+      if (isOrbyEnabled) {
+        if (accountCluster && virtualNode && virtualNode) {
+          setSubmitOperationSetIsLoading(true);
+          const { operationResponses } = await virtualNode.sendOperationSet(
+            accountCluster,
+            operationSet,
+            signTransaction,
+            signUserOperation,
+            signTypedData
+          );
+
+          const ids = operationResponses
+            ?.map((op) => op.id)
+            .filter((id) => !_.isUndefined(id));
+          virtualNode?.subscribeToOperationStatuses(
+            ids,
+            operationStatusesUpdated
+          );
+        }
+      } else {
+        sendTxMutation.mutate(interpretationAction);
+      }
+    },
+    [
+      accountCluster,
+      operationSet,
+      virtualNode,
+      operationStatusesUpdated,
+      isOrbyEnabled,
+      sendTxMutation,
+    ]
+  );
+
+  if (sendTxMutation.isSuccess || submitOperationSuccessful) {
+    invariant(
+      sendTxMutation.data || submitOperationFinalOperationStatus,
+      'Missing Form State View values'
+    );
     invariant(
       snapshotRef.current,
       'State snapshot must be taken before submit'
     );
+
+    const hash: string =
+      submitOperationFinalOperationStatus?.hash ??
+      sendTxMutation.data?.evm?.hash ??
+      ensureSolanaResult(sendTxMutation?.data as SignTransactionResult)
+        .signature;
+
     return (
       <SuccessState
-        hash={result.evm?.hash ?? ensureSolanaResult(result).signature}
+        hash={hash}
         address={address}
         sendFormSnapshot={snapshotRef.current}
         gasbackValue={gasbackValueRef.current}
@@ -336,7 +505,7 @@ function SendFormComponent() {
               : null;
             invariant(confirmDialogRef.current, 'Dialog not found');
             showConfirmDialog(confirmDialogRef.current).then(() => {
-              sendTxMutation.mutate(interpretationAction);
+              submitTransaction(interpretationAction);
             });
           }
         }}
@@ -488,6 +657,8 @@ function SendFormComponent() {
                 setUserFormState((state) => ({ ...state, ...partial }));
               }}
               gasback={gasbackEstimation}
+              selectedGasToken={selectedGasToken}
+              setSelectedGasToken={selectGasToken}
             />
           </React.Suspense>
         ) : addressType === 'solana' ? (
@@ -525,6 +696,9 @@ function SendFormComponent() {
                     paymasterEligible={paymasterEligible}
                     paymasterPossible={sendData.paymasterPossible}
                     onGasbackReady={handleGasbackReady}
+                    operationSet={operationSet}
+                    selectedGasToken={selectedGasToken}
+                    setSelectedGasToken={selectGasToken}
                   />
                 </ViewLoadingSuspense>
               </>
@@ -542,12 +716,21 @@ function SendFormComponent() {
               ? txErrorToMessage(sendTxMutation.error)
               : null}
           </UIText>
+          {operationSetError ? (
+            <UIText kind="body/regular" color="var(--negative-500)">
+              {operationSetError}
+            </UIText>
+          ) : null}
           {wallet ? (
             <SignTransactionButton
               ref={signTxBtnRef}
               form={formId}
               wallet={wallet}
-              disabled={sendTxMutation.isLoading}
+              disabled={
+                sendTxMutation.isLoading ||
+                submitOperationSetIsLoading ||
+                OperationSetLoading
+              }
               holdToSign={false}
             />
           ) : null}

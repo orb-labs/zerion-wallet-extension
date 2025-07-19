@@ -18,6 +18,8 @@ import type { MultichainTransaction } from 'src/shared/types/MultichainTransacti
 import { SecurityStatusBackground } from 'src/ui/shared/security-check';
 import { VStack } from 'src/ui/ui-kit/VStack';
 import { AddressActionNetworkFee } from 'src/ui/pages/SendTransaction/TransactionConfiguration/TransactionConfiguration';
+import type { GasTokenInput } from 'src/ui/pages/SendTransaction/NetworkFee/NetworkFee';
+import type { OperationSet } from '@orb-labs/orby-core';
 import { WalletAvatar } from '../../WalletAvatar';
 import { WalletDisplayName } from '../../WalletDisplayName';
 import { TransactionSimulation } from '../TransactionSimulation';
@@ -35,6 +37,9 @@ export function TransactionConfirmationView({
   customAllowanceValueBase,
   onOpenAllowanceForm,
   onGasbackReady,
+  selectedGasToken,
+  setSelectedGasToken,
+  operationSet,
 }: {
   formId: string;
   title: React.ReactNode;
@@ -49,6 +54,9 @@ export function TransactionConfirmationView({
   customAllowanceValueBase?: string;
   onOpenAllowanceForm?: () => void;
   onGasbackReady: null | ((value: number) => void);
+  selectedGasToken?: GasTokenInput;
+  setSelectedGasToken?: (gasToken?: GasTokenInput) => void;
+  operationSet?: OperationSet;
 }) {
   const { preferences, query } = usePreferences();
 
@@ -127,6 +135,7 @@ export function TransactionConfirmationView({
             address={wallet.address}
             transaction={transaction}
             txInterpretQuery={txInterpretQuery}
+            operationSet={operationSet}
           />
           <Spacer height={20} />
           <React.Suspense
@@ -162,6 +171,8 @@ export function TransactionConfirmationView({
                         }
                       : null
                   }
+                  selectedGasToken={selectedGasToken}
+                  setSelectedGasToken={setSelectedGasToken}
                 />
               ) : txInterpretQuery.data?.action?.transaction.fee ? (
                 <AddressActionNetworkFee
