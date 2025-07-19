@@ -69,10 +69,7 @@ import {
   useGetOperationsToSignTransactionOrSignTypedData,
   useOrby,
 } from '@orb-labs/orby-react';
-import {
-  CreateOperationsStatus,
-  type OnchainOperation,
-} from '@orb-labs/orby-core';
+import { type OnchainOperation } from '@orb-labs/orby-core';
 import type {
   OperationSet,
   OperationStatus,
@@ -90,6 +87,7 @@ import {
   signUserOperation,
 } from 'src/shared/core/orb';
 import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
+import { useOperationSetError } from 'src/ui/shared/hooks/useOperationSetError';
 import { PopoverToast } from '../Settings/PopoverToast';
 import type { PopoverToastHandle } from '../Settings/PopoverToast';
 import { txErrorToMessage } from '../SendTransaction/shared/transactionErrorToMessage';
@@ -608,9 +606,6 @@ function SignTypedDataContent({
   const navigate = useNavigate();
 
   const [allowanceQuantityBase, setAllowanceQuantityBase] = useState('');
-  const [operationSetError, setOperationSetError] = useState<string | null>(
-    null
-  );
 
   const typedData = useMemo(() => {
     const result = toTypedData(typedDataRaw);
@@ -671,6 +666,7 @@ function SignTypedDataContent({
     chainId && isOrbyEnabled ? BigInt(chainId) : undefined,
     gasToken
   );
+  const operationSetError = useOperationSetError(operationSet, isOrbyEnabled);
   const { fungibleTokens } = useGetFungibleTokenPortfolio(
     undefined,
     chainId && isOrbyEnabled ? BigInt(chainId) : undefined
@@ -684,35 +680,6 @@ function SignTypedDataContent({
     },
     [setSelectedGasToken]
   );
-
-  React.useEffect(() => {
-    if (operationSet?.status && isOrbyEnabled) {
-      let errorMessage: string | null = null;
-
-      if (operationSet.status === CreateOperationsStatus.INSUFFICIENT_FUNDS) {
-        errorMessage = 'Insufficient funds';
-      } else if (
-        operationSet.status === CreateOperationsStatus.NO_EXECUTION_PATH
-      ) {
-        errorMessage = 'No execution path';
-      } else if (
-        operationSet.status ===
-        CreateOperationsStatus.INSUFFICIENT_FUNDS_FOR_GAS
-      ) {
-        errorMessage = 'Insufficient funds for gas. Choose another token';
-      } else if (operationSet.status === CreateOperationsStatus.INTERNAL) {
-        errorMessage = 'Internal error';
-      } else if (
-        operationSet.status === CreateOperationsStatus.INVALID_ARGUMENT
-      ) {
-        errorMessage = 'Invalid argument';
-      }
-
-      setOperationSetError(errorMessage);
-    } else {
-      setOperationSetError(null);
-    }
-  }, [operationSet?.status, isOrbyEnabled]);
 
   const { data: interpretation, ...interpretQuery } = useQuery({
     queryKey: [

@@ -22,7 +22,10 @@ import { PageColumn } from 'src/ui/components/PageColumn';
 import { WalletAvatar } from 'src/ui/components/WalletAvatar';
 import { useAddressParams } from 'src/ui/shared/user-address/useAddressParams';
 import { UnstyledLink } from 'src/ui/ui-kit/UnstyledLink';
-import { useNetworkConfig } from 'src/modules/networks/useNetworks';
+import {
+  useNetworkConfig,
+  useNetworks,
+} from 'src/modules/networks/useNetworks';
 import type { Chain } from 'src/modules/networks/Chain';
 import { createChain } from 'src/modules/networks/Chain';
 import { PageTop } from 'src/ui/components/PageTop';
@@ -92,12 +95,28 @@ import type { SignTransactionResult } from 'src/shared/types/SignTransactionResu
 import { ensureSolanaResult } from 'src/modules/shared/transactions/helpers';
 import { isMatchForEcosystem } from 'src/shared/wallet/shared';
 import { Networks } from 'src/modules/networks/Networks';
+import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
+import {
+  useGetFungibleTokenPortfolio,
+  useGetOperationsToSignTransactionOrSignTypedData,
+  useOrby,
+} from '@orb-labs/orby-react';
+import type { OperationStatus } from '@orb-labs/orby-core';
+import { OperationStatusType } from '@orb-labs/orby-core';
+import {
+  signTransaction,
+  signTypedData,
+  signUserOperation,
+} from 'src/shared/core/orb';
+import _ from 'lodash';
+import { useOperationSetError } from 'src/ui/shared/hooks/useOperationSetError';
 import { NetworkSelect } from '../Networks/NetworkSelect';
 import { TransactionConfiguration } from '../SendTransaction/TransactionConfiguration';
 import { txErrorToMessage } from '../SendTransaction/shared/transactionErrorToMessage';
 import { fromConfiguration, toConfiguration } from '../SendForm/shared/helpers';
 import { NetworkFeeLineInfo } from '../SendTransaction/TransactionConfiguration/TransactionConfiguration';
 import { TransactionWarning } from '../SendTransaction/TransactionWarnings/TransactionWarning';
+import { type GasTokenInput } from '../SendTransaction/NetworkFee/NetworkFee';
 import { RateLine } from './Quotes';
 import * as styles from './styles.module.css';
 import { ApproveHintLine } from './ApproveHintLine';
@@ -314,6 +333,14 @@ function SwapFormComponent() {
     useErrorBoundary: true,
   });
 
+  const [submitOperationSetIsLoading, setSubmitOperationSetIsLoading] =
+    useState(false);
+  const [submitOperationSuccessful, setSubmitOperationSuccessful] =
+    useState(false);
+  const [
+    submitOperationFinalOperationStatus,
+    setSubmitOperationFinalOperationStatus,
+  ] = useState<OperationStatus | undefined>(undefined);
   const [userFormState, setUserFormState] = useSearchParamsObj<SwapFormState>();
 
   const refetchInterval = usePositionsRefetchInterval(20000);
@@ -453,8 +480,109 @@ function SwapFormComponent() {
     supportsSponsoredTransactions: network?.supports_sponsored_transactions,
   });
 
-  const currentTransaction =
-    selectedQuote?.transactionApprove || selectedQuote?.transactionSwap || null;
+  const { accountCluster } = useOrby();
+  const { networks } = useNetworks(
+    inputChain ? [inputChain.toString()] : undefined
+  );
+
+  const chain = useMemo(() => {
+    if (inputChain) {
+      return createChain(inputChain);
+    }
+    return null;
+  }, [inputChain]);
+
+  const chainId = useMemo(() => {
+    const id =
+      inputChain == 'solana'
+        ? 101
+        : chain && networks
+        ? networks.getChainId(chain)
+        : null;
+
+    if (id) {
+      return BigInt(id);
+    }
+    return undefined;
+  }, [chain, inputChain, networks]);
+
+  const isOrbyEnabled = useIsOrbyEnabled(chainId);
+  const { fungibleTokens } = useGetFungibleTokenPortfolio(undefined, chainId);
+
+  const currentTransaction = useMemo(() => {
+    if (isOrbyEnabled) {
+      return selectedQuote?.transactionSwap || null;
+    } else {
+      return (
+        selectedQuote?.transactionApprove ||
+        selectedQuote?.transactionSwap ||
+        null
+      );
+    }
+  }, [selectedQuote, isOrbyEnabled]);
+
+  const [selectedGasToken, setSelectedGasToken] = useState<GasTokenInput>({
+    name: 'Native Token',
+    standardizedTokenId: undefined,
+    isDefault: true,
+  });
+
+  const gasToken = useMemo(() => {
+    return selectedGasToken?.standardizedTokenId
+      ? { standardizedTokenId: selectedGasToken.standardizedTokenId }
+      : undefined;
+  }, [selectedGasToken]);
+
+  const orbyParams = useMemo(() => {
+    if (!isOrbyEnabled) {
+      return { data: '0x' };
+    } else if (selectedQuote?.transactionSwap?.evm) {
+      return {
+        data: selectedQuote?.transactionSwap?.evm?.data as string,
+        to: selectedQuote?.transactionSwap?.evm?.to as string,
+        value: selectedQuote?.transactionSwap?.evm?.value
+          ? BigInt(selectedQuote?.transactionSwap?.evm?.value?.toString())
+          : undefined,
+        entrypointAccountAddress: wallet?.address as string,
+        chainId,
+        gasToken,
+      };
+    } else if (selectedQuote?.transactionSwap?.solana) {
+      return {
+        data: selectedQuote?.transactionSwap?.solana as string,
+        entrypointAccountAddress: wallet?.address as string,
+        chainId: BigInt(101),
+        gasToken,
+      };
+    } else {
+      return { data: '0x' };
+    }
+  }, [selectedQuote, isOrbyEnabled, chainId, wallet, gasToken]);
+
+  const {
+    operationSet,
+    virtualNode,
+    aggregateFee,
+    isLoading: OperationSetLoading,
+  } = useGetOperationsToSignTransactionOrSignTypedData(
+    orbyParams?.data,
+    orbyParams?.to,
+    orbyParams?.value,
+    orbyParams?.entrypointAccountAddress,
+    orbyParams?.chainId,
+    orbyParams.gasToken
+  );
+
+  const operationSetError = useOperationSetError(operationSet, isOrbyEnabled);
+
+  const selectGasToken = useCallback(
+    (gasToken?: GasTokenInput) => {
+      if (gasToken) {
+        setSelectedGasToken(gasToken);
+      }
+    },
+    [setSelectedGasToken]
+  );
 
   const [allowanceBase, setAllowanceBase] = useState<string | null>(null);
 
@@ -587,6 +715,60 @@ function SwapFormComponent() {
     },
   });
 
+  const operationStatusesUpdated = useCallback(
+    async (
+      statusSummary: OperationStatusType,
+      finalTransactionStatus?: OperationStatus,
+      _statuses?: OperationStatus[]
+    ) => {
+      if (
+        [OperationStatusType.SUCCESSFUL, OperationStatusType.PENDING].includes(
+          statusSummary
+        )
+      ) {
+        setSubmitOperationSetIsLoading(false);
+        setSubmitOperationSuccessful(true);
+        setSubmitOperationFinalOperationStatus(finalTransactionStatus);
+      }
+    },
+    []
+  );
+
+  const submitTransaction = useCallback(
+    async (interpretationAction: AddressAction | null) => {
+      if (isOrbyEnabled) {
+        if (accountCluster && virtualNode && virtualNode) {
+          setSubmitOperationSetIsLoading(true);
+          const { operationResponses } = await virtualNode.sendOperationSet(
+            accountCluster,
+            operationSet,
+            signTransaction,
+            signUserOperation,
+            signTypedData
+          );
+
+          const ids = operationResponses
+            ?.map((op) => op.id)
+            .filter((id) => !_.isUndefined(id));
+          virtualNode?.subscribeToOperationStatuses(
+            ids,
+            operationStatusesUpdated
+          );
+        }
+      } else {
+        sendTransaction(interpretationAction);
+      }
+    },
+    [
+      accountCluster,
+      operationSet,
+      virtualNode,
+      operationStatusesUpdated,
+      isOrbyEnabled,
+      sendTransaction,
+    ]
+  );
+
   const outputAmount = selectedQuote?.outputAmount.quantity || null;
 
   const priceImpact = useMemo(() => {
@@ -605,19 +787,27 @@ function SwapFormComponent() {
 
   const navigate = useNavigate();
 
-  if (sendTransactionMutation.isSuccess) {
-    const result = sendTransactionMutation.data;
+  if (sendTransactionMutation.isSuccess || submitOperationSuccessful) {
     invariant(
-      inputPosition && outputPosition && result,
+      inputPosition &&
+        outputPosition &&
+        (sendTransactionMutation.data || submitOperationFinalOperationStatus),
       'Missing Form State View values'
     );
     invariant(
       snapshotRef.current,
       'State snapshot must be taken before submit'
     );
+
+    const hash: string =
+      submitOperationFinalOperationStatus?.hash ??
+      sendTransactionMutation.data?.evm?.hash ??
+      ensureSolanaResult(sendTransactionMutation.data as SignTransactionResult)
+        .signature;
+
     return (
       <SuccessState
-        hash={result.evm?.hash ?? ensureSolanaResult(result).signature}
+        hash={hash}
         inputPosition={inputPosition}
         outputPosition={outputPosition}
         swapFormState={snapshotRef.current.state}
@@ -737,6 +927,9 @@ function SwapFormComponent() {
                   },
                 }}
                 onGasbackReady={handleGasbackReady}
+                selectedGasToken={selectedGasToken}
+                setSelectedGasToken={selectGasToken}
+                operationSet={operationSet}
               />
             </ViewLoadingSuspense>
           );
@@ -819,7 +1012,7 @@ function SwapFormComponent() {
               if (submitType === 'approve') {
                 sendApproveTransaction(interpretationAction);
               } else if (submitType === 'swap') {
-                sendTransaction(interpretationAction);
+                submitTransaction(interpretationAction);
               } else {
                 throw new Error('Must set a submit_type to form');
               }
@@ -939,6 +1132,8 @@ function SwapFormComponent() {
                   setUserFormState((state) => ({ ...state, ...partial }));
                 }}
                 gasback={gasbackEstimation}
+                selectedGasToken={selectedGasToken}
+                setSelectedGasToken={selectGasToken}
               />
             </React.Suspense>
           ) : null}
@@ -947,6 +1142,11 @@ function SwapFormComponent() {
             <NetworkFeeLineInfo
               networkFee={selectedQuote.networkFee}
               isLoading={quotesData.isPreviousData}
+              selectedGasToken={selectedGasToken}
+              selectGasToken={selectGasToken}
+              aggregateFee={aggregateFee}
+              operationSet={operationSet}
+              fungibleTokens={fungibleTokens}
             />
           ) : null}
           {selectedQuote?.protocolFee.percentage === 0 ? (
@@ -963,6 +1163,11 @@ function SwapFormComponent() {
             title="Warning"
             message={selectedQuote?.error?.message}
           />
+        ) : null}
+        {operationSetError ? (
+          <UIText kind="body/regular" color="var(--negative-500)">
+            {operationSetError}
+          </UIText>
         ) : null}
         {quotesData.done && priceImpact && !isApproveMode ? (
           <PriceImpactLine priceImpact={priceImpact} />
@@ -1066,7 +1271,9 @@ function SwapFormComponent() {
                         Boolean(
                           (selectedQuote && !selectedQuote.transactionSwap) ||
                             quotesData.error
-                        )
+                        ) ||
+                        OperationSetLoading ||
+                        submitOperationSetIsLoading
                       }
                       holdToSign={false}
                     >
@@ -1079,9 +1286,10 @@ function SwapFormComponent() {
                         }}
                       >
                         {hint ||
-                          (quotesData.isLoading
+                          (quotesData.isLoading || OperationSetLoading
                             ? 'Fetching offers'
-                            : sendTransactionMutation.isLoading
+                            : sendTransactionMutation.isLoading ||
+                              submitOperationSetIsLoading
                             ? 'Sending...'
                             : 'Swap')}
                       </span>

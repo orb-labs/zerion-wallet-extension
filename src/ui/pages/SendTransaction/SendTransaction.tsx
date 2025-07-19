@@ -110,10 +110,7 @@ import type {
   OperationStatus,
   StandardizedBalance,
 } from '@orb-labs/orby-core';
-import {
-  CreateOperationsStatus,
-  OperationStatusType,
-} from '@orb-labs/orby-core';
+import { OperationStatusType } from '@orb-labs/orby-core';
 import {
   signUserOperation,
   signTransaction,
@@ -122,6 +119,7 @@ import {
 import _ from 'lodash';
 import type { Hex } from '@noble/ed25519';
 import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
+import { useOperationSetError } from 'src/ui/shared/hooks/useOperationSetError';
 import type { PopoverToastHandle } from '../Settings/PopoverToast';
 import { PopoverToast } from '../Settings/PopoverToast';
 import { TransactionConfiguration } from './TransactionConfiguration';
@@ -585,10 +583,6 @@ function SendTransactionContent({
   const [allowanceQuantityBase, setAllowanceQuantityBase] = useState('');
   const [submitTransactionIsLoading, setSubmitTransactionIsLoading] =
     useState(false);
-  const [operationSetError, setOperationSetError] = useState<string | null>(
-    null
-  );
-
   const configureTransactionToBeSigned = useEvent(
     async (
       transaction: IncomingTransaction,
@@ -652,35 +646,7 @@ function SendTransactionContent({
     [setSelectedGasToken]
   );
 
-  // Check for operation set errors and update error state
-  React.useEffect(() => {
-    if (operationSet?.status && isOrbyEnabled) {
-      let errorMessage: string | null = null;
-
-      if (operationSet.status === CreateOperationsStatus.INSUFFICIENT_FUNDS) {
-        errorMessage = 'Insufficient funds';
-      } else if (
-        operationSet.status === CreateOperationsStatus.NO_EXECUTION_PATH
-      ) {
-        errorMessage = 'No execution path';
-      } else if (
-        operationSet.status ===
-        CreateOperationsStatus.INSUFFICIENT_FUNDS_FOR_GAS
-      ) {
-        errorMessage = 'Insufficient funds for gas. Choose another token';
-      } else if (operationSet.status === CreateOperationsStatus.INTERNAL) {
-        errorMessage = 'Internal error';
-      } else if (
-        operationSet.status === CreateOperationsStatus.INVALID_ARGUMENT
-      ) {
-        errorMessage = 'Invalid argument';
-      }
-
-      setOperationSetError(errorMessage);
-    } else {
-      setOperationSetError(null);
-    }
-  }, [operationSet?.status, isOrbyEnabled]);
+  const operationSetError = useOperationSetError(operationSet, isOrbyEnabled);
 
   const paymasterPossible =
     USE_PAYMASTER_FEATURE && Boolean(network?.supports_sponsored_transactions);
@@ -1373,9 +1339,6 @@ function SolSendTransaction() {
   const isOrbyEnabled = useIsOrbyEnabled(BigInt(101));
   const [submitOperationSetIsLoading, setSubmitOperationSetIsLoading] =
     useState(false);
-  const [operationSetError, setOperationSetError] = useState<string | null>(
-    null
-  );
 
   const navigate = useNavigate();
   const next = params.get('next');
@@ -1437,7 +1400,7 @@ function SolSendTransaction() {
     gasToken,
     new Map([['method', txParams.method]])
   );
-
+  const operationSetError = useOperationSetError(operationSet, isOrbyEnabled);
   const selectGasToken = useCallback(
     (gasToken?: GasTokenInput) => {
       if (gasToken) {
@@ -1446,35 +1409,6 @@ function SolSendTransaction() {
     },
     [setSelectedGasToken]
   );
-
-  React.useEffect(() => {
-    if (operationSet?.status && isOrbyEnabled) {
-      let errorMessage: string | null = null;
-
-      if (operationSet.status === CreateOperationsStatus.INSUFFICIENT_FUNDS) {
-        errorMessage = 'Insufficient funds';
-      } else if (
-        operationSet.status === CreateOperationsStatus.NO_EXECUTION_PATH
-      ) {
-        errorMessage = 'No execution path';
-      } else if (
-        operationSet.status ===
-        CreateOperationsStatus.INSUFFICIENT_FUNDS_FOR_GAS
-      ) {
-        errorMessage = 'Insufficient funds for gas. Choose another token';
-      } else if (operationSet.status === CreateOperationsStatus.INTERNAL) {
-        errorMessage = 'Internal error';
-      } else if (
-        operationSet.status === CreateOperationsStatus.INVALID_ARGUMENT
-      ) {
-        errorMessage = 'Invalid argument';
-      }
-
-      setOperationSetError(errorMessage);
-    } else {
-      setOperationSetError(null);
-    }
-  }, [operationSet?.status, isOrbyEnabled]);
 
   // TODO: support multiple transactions in simulation
   const interpretQuery = useQuery({
