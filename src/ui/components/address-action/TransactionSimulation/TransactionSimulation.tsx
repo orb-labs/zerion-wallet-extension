@@ -29,6 +29,7 @@ import { solFromBase64 } from 'src/modules/solana/transactions/create';
 import { createChain } from 'src/modules/networks/Chain';
 import { NetworkId } from 'src/modules/networks/NetworkId';
 import type { MultichainTransaction } from 'src/shared/types/MultichainTransaction';
+import type { OperationSet } from '@orb-labs/orby-core';
 import { AddressActionDetails } from '../AddressActionDetails';
 
 export function TransactionSimulation({
@@ -37,12 +38,14 @@ export function TransactionSimulation({
   txInterpretQuery,
   customAllowanceValueBase,
   onOpenAllowanceForm,
+  operationSet,
 }: {
   address: string;
   transaction: MultichainTransaction;
   txInterpretQuery: ReturnType<typeof useInterpretTxBasedOnEligibility>;
   customAllowanceValueBase?: string;
   onOpenAllowanceForm?: () => void;
+  operationSet?: OperationSet;
 }) {
   const advancedDialogRef = useRef<HTMLDialogElementInterface | null>(null);
   const toastRef = useRef<PopoverToastHandle>(null);
@@ -155,6 +158,7 @@ export function TransactionSimulation({
                 transaction={transaction}
                 addressAction={addressAction}
                 onCopyData={() => toastRef.current?.showToast()}
+                operationSet={operationSet}
               />
             </>
           );

@@ -92,9 +92,25 @@ import { ensureSolanaResult } from 'src/modules/shared/transactions/helpers';
 import { isSolanaAddress } from 'src/modules/solana/shared';
 import { isEthereumAddress } from 'src/shared/isEthereumAddress';
 import { getAddressType } from 'src/shared/wallet/classifiers';
+import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
+import {
+  useGetFungibleTokenPortfolio,
+  useGetOperationsToSignTransactionOrSignTypedData,
+  useOrby,
+} from '@orb-labs/orby-react';
+import type { OperationStatus } from '@orb-labs/orby-core';
+import { OperationStatusType } from '@orb-labs/orby-core';
+import {
+  signTransaction,
+  signTypedData,
+  signUserOperation,
+} from 'src/shared/core/orb';
+import _ from 'lodash';
+import { useOperationSetError } from 'src/ui/shared/hooks/useOperationSetError';
 import { TransactionConfiguration } from '../SendTransaction/TransactionConfiguration';
 import { ApproveHintLine } from '../SwapForm/ApproveHintLine';
 import { txErrorToMessage } from '../SendTransaction/shared/transactionErrorToMessage';
+import type { GasTokenInput } from '../SendTransaction/NetworkFee/NetworkFee';
 import { getQuotesErrorMessage } from '../SwapForm/Quotes/getQuotesErrorMessage';
 import { getPopularTokens } from '../SwapForm/shared/getPopularTokens';
 import { usePosition } from '../SwapForm/shared/usePosition';
@@ -414,6 +430,14 @@ function BridgeFormComponent() {
     useErrorBoundary: true,
   });
 
+  const [submitOperationSetIsLoading, setSubmitOperationSetIsLoading] =
+    useState(false);
+  const [submitOperationSuccessful, setSubmitOperationSuccessful] =
+    useState(false);
+  const [
+    submitOperationFinalOperationStatus,
+    setSubmitOperationFinalOperationStatus,
+  ] = useState<OperationStatus | undefined>(undefined);
   const [userFormState, setUserFormState] =
     useSearchParamsObj<BridgeFormState>();
 
@@ -601,14 +625,116 @@ function BridgeFormComponent() {
       inputNetwork?.supports_sponsored_transactions,
   });
 
-  const currentTransaction =
-    selectedQuote?.transactionApprove || selectedQuote?.transactionSwap || null;
+  const { accountCluster } = useOrby();
+  const { networks } = useNetworks(
+    inputChain ? [inputChain.toString()] : undefined
+  );
+
+  const chain = useMemo(() => {
+    if (inputChain) {
+      return createChain(inputChain);
+    }
+    return null;
+  }, [inputChain]);
+
+  const chainId = useMemo(() => {
+    const id =
+      inputChain == 'solana'
+        ? 101
+        : chain && networks
+        ? networks.getChainId(chain)
+        : null;
+
+    if (id) {
+      return BigInt(id);
+    }
+    return undefined;
+  }, [chain, inputChain, networks]);
+
+  const isOrbyEnabled = useIsOrbyEnabled(chainId);
+
+  const currentTransaction = useMemo(() => {
+    if (isOrbyEnabled) {
+      return selectedQuote?.transactionSwap || null;
+    } else {
+      return (
+        selectedQuote?.transactionApprove ||
+        selectedQuote?.transactionSwap ||
+        null
+      );
+    }
+  }, [selectedQuote, isOrbyEnabled]);
+
+  const [selectedGasToken, setSelectedGasToken] = useState<GasTokenInput>({
+    name: 'Native Token',
+    standardizedTokenId: undefined,
+    isDefault: true,
+  });
+
+  const gasToken = useMemo(() => {
+    return selectedGasToken?.standardizedTokenId
+      ? { standardizedTokenId: selectedGasToken.standardizedTokenId }
+      : undefined;
+  }, [selectedGasToken]);
+
+  const { fungibleTokens } = useGetFungibleTokenPortfolio(undefined, chainId);
 
   const [allowanceBase, setAllowanceBase] = useState<string | null>(null);
 
   useEffect(
     () => setAllowanceBase(null),
     [inputChain, inputAmount, inputFungibleId]
+  );
+
+  const orbyParams = useMemo(() => {
+    if (!isOrbyEnabled) {
+      return { data: '0x' };
+    } else if (selectedQuote?.transactionSwap?.evm) {
+      return {
+        data: selectedQuote?.transactionSwap?.evm?.data as string,
+        to: selectedQuote?.transactionSwap?.evm?.to as string,
+        value: selectedQuote?.transactionSwap?.evm?.value
+          ? BigInt(selectedQuote?.transactionSwap?.evm?.value?.toString())
+          : undefined,
+        entrypointAccountAddress: wallet?.address as string,
+        chainId,
+        gasToken,
+      };
+    } else if (selectedQuote?.transactionSwap?.solana) {
+      return {
+        data: selectedQuote?.transactionSwap?.solana as string,
+        entrypointAccountAddress: wallet?.address as string,
+        chainId: BigInt(101),
+        gasToken,
+      };
+    } else {
+      return { data: '0x' };
+    }
+  }, [selectedQuote, isOrbyEnabled, chainId, wallet, gasToken]);
+
+  const {
+    operationSet,
+    virtualNode,
+    aggregateFee,
+    isLoading: OperationSetLoading,
+  } = useGetOperationsToSignTransactionOrSignTypedData(
+    orbyParams?.data,
+    orbyParams?.to,
+    orbyParams?.value,
+    orbyParams?.entrypointAccountAddress,
+    orbyParams?.chainId,
+    orbyParams.gasToken
+  );
+
+  const operationSetError = useOperationSetError(operationSet, isOrbyEnabled);
+
+  const selectGasToken = useCallback(
+    (gasToken?: GasTokenInput) => {
+      if (gasToken) {
+        setSelectedGasToken(gasToken);
+      }
+    },
+    [setSelectedGasToken]
   );
 
   const {
@@ -738,6 +864,60 @@ function BridgeFormComponent() {
     },
   });
 
+  const operationStatusesUpdated = useCallback(
+    async (
+      statusSummary: OperationStatusType,
+      finalTransactionStatus?: OperationStatus,
+      _statuses?: OperationStatus[]
+    ) => {
+      if (
+        [OperationStatusType.SUCCESSFUL, OperationStatusType.PENDING].includes(
+          statusSummary
+        )
+      ) {
+        setSubmitOperationSetIsLoading(false);
+        setSubmitOperationSuccessful(true);
+        setSubmitOperationFinalOperationStatus(finalTransactionStatus);
+      }
+    },
+    []
+  );
+
+  const submitTransaction = useCallback(
+    async (interpretationAction: AddressAction | null) => {
+      if (isOrbyEnabled) {
+        if (accountCluster && virtualNode && virtualNode) {
+          setSubmitOperationSetIsLoading(true);
+          const { operationResponses } = await virtualNode.sendOperationSet(
+            accountCluster,
+            operationSet,
+            signTransaction,
+            signUserOperation,
+            signTypedData
+          );
+
+          const ids = operationResponses
+            ?.map((op) => op.id)
+            .filter((id) => !_.isUndefined(id));
+          virtualNode?.subscribeToOperationStatuses(
+            ids,
+            operationStatusesUpdated
+          );
+        }
+      } else {
+        sendTransaction(interpretationAction);
+      }
+    },
+    [
+      accountCluster,
+      operationSet,
+      virtualNode,
+      operationStatusesUpdated,
+      isOrbyEnabled,
+      sendTransaction,
+    ]
+  );
+
   const gasbackValueRef = useRef<number | null>(null);
   const handleGasbackReady = useCallback((value: number) => {
     gasbackValueRef.current = value;
@@ -756,19 +936,27 @@ function BridgeFormComponent() {
     [outputEcosystem]
   );
 
-  if (sendTransactionMutation.isSuccess) {
-    const result = sendTransactionMutation.data;
+  if (sendTransactionMutation.isSuccess || submitOperationSuccessful) {
     invariant(
-      inputPosition && outputPosition && result,
+      inputPosition &&
+        outputPosition &&
+        (sendTransactionMutation.data || submitOperationFinalOperationStatus),
       'Missing Form State View values'
     );
     invariant(
       snapshotRef.current,
       'State snapshot must be taken before submit'
     );
+
+    const hash: string =
+      submitOperationFinalOperationStatus?.hash ??
+      sendTransactionMutation.data?.evm?.hash ??
+      ensureSolanaResult(sendTransactionMutation.data as SignTransactionResult)
+        .signature;
+
     return (
       <SuccessState
-        hash={result.evm?.hash ?? ensureSolanaResult(result).signature}
+        hash={hash}
         explorer={selectedQuote?.contractMetadata?.explorer ?? null}
         inputPosition={inputPosition}
         outputPosition={outputPosition}
@@ -776,6 +964,9 @@ function BridgeFormComponent() {
         gasbackValue={gasbackValueRef.current}
         onDone={() => {
           sendTransactionMutation.reset();
+          setSubmitOperationSuccessful(false);
+          setSubmitOperationFinalOperationStatus(undefined);
+          setSubmitOperationSetIsLoading(false);
           snapshotRef.current = null;
           gasbackValueRef.current = null;
           navigate('/overview/history');
@@ -852,6 +1043,9 @@ function BridgeFormComponent() {
                   },
                 }}
                 onGasbackReady={handleGasbackReady}
+                selectedGasToken={selectedGasToken}
+                setSelectedGasToken={selectGasToken}
+                operationSet={operationSet}
               />
             </ViewLoadingSuspense>
           );
@@ -934,7 +1128,7 @@ function BridgeFormComponent() {
               if (submitType === 'approve') {
                 sendApproveTransaction(interpretationAction);
               } else if (submitType === 'bridge') {
-                sendTransaction(interpretationAction);
+                submitTransaction(interpretationAction);
               } else {
                 throw new Error('Must set a submit_type to form');
               }
@@ -1050,6 +1244,11 @@ function BridgeFormComponent() {
             onQuoteIdChange={(quoteId) => setUserQuoteId(quoteId)}
           />
           {selectedQuote ? <ZerionFeeLine quote={selectedQuote} /> : null}
+          {operationSetError ? (
+            <UIText kind="body/regular" color="var(--negative-500)">
+              {operationSetError}
+            </UIText>
+          ) : null}
           {isEthereumAddress(address) &&
           currentTransaction?.evm &&
           spendChain ? (
@@ -1079,6 +1278,8 @@ function BridgeFormComponent() {
                   setUserFormState((state) => ({ ...state, ...partial }));
                 }}
                 gasback={gasbackEstimation}
+                selectedGasToken={selectedGasToken}
+                setSelectedGasToken={selectGasToken}
               />
             </React.Suspense>
           ) : null}
@@ -1087,6 +1288,11 @@ function BridgeFormComponent() {
             <NetworkFeeLineInfo
               networkFee={selectedQuote.networkFee}
               isLoading={quotesData.isPreviousData}
+              selectedGasToken={selectedGasToken}
+              selectGasToken={selectGasToken}
+              aggregateFee={aggregateFee}
+              operationSet={operationSet}
+              fungibleTokens={fungibleTokens}
             />
           ) : null}
         </VStack>
@@ -1194,7 +1400,9 @@ function BridgeFormComponent() {
                         Boolean(
                           (selectedQuote && !selectedQuote.transactionSwap) ||
                             quotesData.error
-                        )
+                        ) ||
+                        OperationSetLoading ||
+                        submitOperationSetIsLoading
                       }
                       holdToSign={false}
                     >
@@ -1207,9 +1415,10 @@ function BridgeFormComponent() {
                         }}
                       >
                         {hint ||
-                          (quotesData.isLoading
+                          (quotesData.isLoading || OperationSetLoading
                             ? 'Fetching offers'
-                            : sendTransactionMutation.isLoading
+                            : sendTransactionMutation.isLoading ||
+                              submitOperationSetIsLoading
                             ? 'Sending...'
                             : 'Send')}
                       </span>
