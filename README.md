@@ -61,6 +61,10 @@ This command will build the extension in development mode. The output files are 
 1. **Enable Developer Mode in Chrome**: Go to `chrome://extensions` and enable Developer mode.
 2. **Import the Extension**: Click on "Load unpacked" and select the build folder (`./dist` from the previous step).
 
+## Documentation
+
+- [Orby Integration Rollout Strategy](docs/ORBY_ROLLOUT_STRATEGY.md) - Specific rollout plan for Orby 1-click transactions
+
 ## License
 
 [GPL-3.0](LICENSE) License
