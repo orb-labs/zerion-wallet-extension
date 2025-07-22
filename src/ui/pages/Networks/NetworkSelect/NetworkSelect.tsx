@@ -10,9 +10,8 @@ import { useAddressParams } from 'src/ui/shared/user-address/useAddressParams';
 import { Button } from 'src/ui/ui-kit/Button';
 import { HStack } from 'src/ui/ui-kit/HStack';
 import AllNetworksIcon from 'jsx:src/ui/assets/all-networks.svg';
-import NetworkIcon from 'jsx:src/ui/assets/network.svg';
 import ArrowDownIcon from 'jsx:src/ui/assets/caret-down-filled.svg';
-import { NetworkIcon as NetworkIconComponent } from 'src/ui/components/NetworkIcon';
+import { NetworkIcon } from 'src/ui/components/NetworkIcon';
 import { noValueDash } from 'src/ui/shared/typography';
 import { createChain } from 'src/modules/networks/Chain';
 import { useNetworks } from 'src/modules/networks/useNetworks';
@@ -69,7 +68,7 @@ export function NetworkSelect({
   function handleDialogOpen() {
     invariant(dialogRef.current, 'Dialog element not found');
     showConfirmDialog(dialogRef.current).then(async (chain) => {
-      if (chain !== 'all' && chain !== NetworkSelectValue.Unified) {
+      if (chain !== 'all') {
         // TODO: should we combine these calls?
         await walletPort.request('uiChainSelected', { chain });
         await walletPort.request('addVisitedEthereumChain', { chain });
@@ -79,10 +78,7 @@ export function NetworkSelect({
     });
   }
 
-  const chain =
-    value === NetworkSelectValue.All || value === NetworkSelectValue.Unified
-      ? null
-      : createChain(value);
+  const chain = value === NetworkSelectValue.All ? null : createChain(value);
   const { networks, isLoading } = useNetworks(
     chain ? [chain.toString()] : undefined
   );
@@ -131,21 +127,13 @@ export function NetworkSelect({
           <HStack gap={8} alignItems="center">
             {!network ||
             value === NetworkSelectValue.All ||
-            value === NetworkSelectValue.Unified ||
             !network.icon_url ? (
-              value === NetworkSelectValue.Unified ? (
-                <NetworkIcon
-                  style={{ width: 24, height: 24 }}
-                  role="presentation"
-                />
-              ) : (
-                <AllNetworksIcon
-                  style={{ width: 24, height: 24 }}
-                  role="presentation"
-                />
-              )
+              <AllNetworksIcon
+                style={{ width: 24, height: 24 }}
+                role="presentation"
+              />
             ) : (
-              <NetworkIconComponent
+              <NetworkIcon
                 size={24}
                 src={network.icon_url}
                 name={network.name}
@@ -155,8 +143,6 @@ export function NetworkSelect({
               <span>
                 {value === NetworkSelectValue.All
                   ? 'All Networks'
-                  : value === NetworkSelectValue.Unified
-                  ? 'Unified'
                   : chain
                   ? networks?.getChainName(chain)
                   : noValueDash}
