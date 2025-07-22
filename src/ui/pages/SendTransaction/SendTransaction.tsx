@@ -99,10 +99,8 @@ import ScrollIcon from 'jsx:src/ui/assets/scroll.svg';
 import ArrowDownIcon from 'jsx:src/ui/assets/caret-down-filled.svg';
 import { SiteFaviconImg } from 'src/ui/components/SiteFaviconImg';
 import { NetworkId } from 'src/modules/networks/NetworkId';
-import { useGetOperationsToExecuteTransaction } from '@orb-labs/orby-react';
-import { CreateOperationsStatus } from '@orb-labs/orby-core';
-import _ from 'lodash';
 import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
+import { useOrbyGetOperationsToSignTransactionOrSignTypedData } from 'src/ui/shared/hooks/useOrbyGetOperationsToSignTransactionOrSignTypedData';
 import type { PopoverToastHandle } from '../Settings/PopoverToast';
 import { PopoverToast } from '../Settings/PopoverToast';
 import { TransactionConfiguration } from './TransactionConfiguration';
@@ -564,9 +562,6 @@ function SendTransactionContent({
     });
 
   const [allowanceQuantityBase, setAllowanceQuantityBase] = useState('');
-  const [operationSetError, setOperationSetError] = useState<string | null>(
-    null
-  );
 
   const configureTransactionToBeSigned = useEvent(
     async (
@@ -597,26 +592,6 @@ function SendTransactionContent({
     isDefault: true,
   });
 
-  const gasToken = useMemo(() => {
-    return selectedGasToken?.standardizedTokenId
-      ? { standardizedTokenId: selectedGasToken.standardizedTokenId }
-      : undefined;
-  }, [selectedGasToken]);
-
-  const { operationSet, isLoading: OperationSetLoading } =
-    useGetOperationsToExecuteTransaction(
-      isOrbyEnabled ? (wallet?.address as string) : undefined,
-      isOrbyEnabled && populatedTransaction?.chainId
-        ? BigInt(populatedTransaction?.chainId as number)
-        : undefined,
-      populatedTransaction?.to as string,
-      populatedTransaction?.data as string,
-      populatedTransaction?.value
-        ? BigInt(populatedTransaction?.value.toString())
-        : undefined,
-      gasToken
-    );
-
   const selectGasToken = useCallback(
     (gasToken?: GasTokenInput) => {
       if (gasToken) {
@@ -626,35 +601,13 @@ function SendTransactionContent({
     [setSelectedGasToken]
   );
 
-  // Check for operation set errors and update error state
-  React.useEffect(() => {
-    if (operationSet?.status && isOrbyEnabled) {
-      let errorMessage: string | null = null;
-
-      if (operationSet.status === CreateOperationsStatus.INSUFFICIENT_FUNDS) {
-        errorMessage = 'Insufficient funds';
-      } else if (
-        operationSet.status === CreateOperationsStatus.NO_EXECUTION_PATH
-      ) {
-        errorMessage = 'No execution path';
-      } else if (
-        operationSet.status ===
-        CreateOperationsStatus.INSUFFICIENT_FUNDS_FOR_GAS
-      ) {
-        errorMessage = 'Insufficient funds for gas. Choose another token';
-      } else if (operationSet.status === CreateOperationsStatus.INTERNAL) {
-        errorMessage = 'Internal error';
-      } else if (
-        operationSet.status === CreateOperationsStatus.INVALID_ARGUMENT
-      ) {
-        errorMessage = 'Invalid argument';
-      }
-
-      setOperationSetError(errorMessage);
-    } else {
-      setOperationSetError(null);
-    }
-  }, [operationSet?.status, isOrbyEnabled]);
+  const { operationSet, operationSetError, operationSetLoading } =
+    useOrbyGetOperationsToSignTransactionOrSignTypedData(
+      populatedTransaction,
+      wallet,
+      isOrbyEnabled,
+      selectedGasToken
+    );
 
   const paymasterPossible =
     USE_PAYMASTER_FEATURE && Boolean(network?.supports_sponsored_transactions);
@@ -948,11 +901,11 @@ function SendTransactionContent({
                   ref={sendTxBtnRef}
                   onClick={() => sendTransaction()}
                   isLoading={
-                    sendTransactionMutation.isLoading || OperationSetLoading
+                    sendTransactionMutation.isLoading || operationSetLoading
                   }
                   disabled={
                     sendTransactionMutation.isLoading ||
-                    OperationSetLoading ||
+                    operationSetLoading ||
                     !!operationSetError
                   }
                   buttonKind={
