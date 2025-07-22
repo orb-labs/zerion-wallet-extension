@@ -47,7 +47,8 @@ export const getWalletVirtualEnvironment = (
 
 export async function signSVMTransaction(
   txRpcUrl: string,
-  data: string
+  data: string,
+  address: string
 ): Promise<string> {
   const connection = new Connection(txRpcUrl);
   const originalTransaction = toTransaction(data);
@@ -61,6 +62,7 @@ export async function signSVMTransaction(
 
   const result = (await walletPort.request('signSVMTransaction', {
     transaction: solToBase64(originalTransaction),
+    address,
   })) as SolSignTransactionResult;
 
   return result.tx;
@@ -94,13 +96,18 @@ async function signEVMTransaction(
     delete parsedData.types['EIP712Domain'];
     return (await walletPort.request('signTypedData', {
       typedData: parsedData,
+      address: operation.from as string,
     })) as string;
   }
 }
 
 async function signOperation(operation: OnchainOperation): Promise<string> {
   if (getWalletVirtualEnvironment(operation.from as string) == VMType.SVM) {
-    return signSVMTransaction(operation.txRpcUrl, operation.data);
+    return signSVMTransaction(
+      operation.txRpcUrl,
+      operation.data,
+      operation.from as string
+    );
   }
 
   return signEVMTransaction(operation);
