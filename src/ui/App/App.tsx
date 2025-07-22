@@ -41,6 +41,9 @@ import {
 } from '@orb-labs/orby-core';
 import { useIsOneClickTransactionsAndGasAbstractionEnabled } from 'src/shared/core/useIsOneClickTransactionsAndGasAbstractionEnabled';
 import { getWalletVirtualEnvironment } from 'src/shared/core/orb';
+import { useIsChainAbstractionFeatureFlagEnabled } from 'src/shared/core/useIsChainAbstractionFeatureFlagEnabled';
+import { NetworkSelectValue } from 'src/modules/networks/NetworkSelectValue';
+import { useEnableChainAbstraction } from 'src/shared/core/useEnableChainAbstraction';
 import { Login } from '../pages/Login';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import {
@@ -268,7 +271,7 @@ function Views({ initialRoute }: { initialRoute?: string }) {
             }
           />
           <Route
-            path="/asset/:asset_code"
+            path="/asset/:asset_code/:standardizedTokenId"
             element={
               <RequireAuth>
                 <AssetInfo />
@@ -488,6 +491,8 @@ function GlobalKeyboardShortcuts() {
 }
 
 function RegisterSessions() {
+  useEnableChainAbstraction(NetworkSelectValue.Unified);
+
   const { data: allConnectedSites, isFetching } = useQuery({
     queryKey: ['getPermissionsWithWallets'],
     queryFn: getPermissionsWithWallets,
@@ -542,6 +547,42 @@ export interface AppProps {
   inspect?: { message: string };
 }
 
+function useCurrentWalletGroup() {
+  const { data: currentWallet } = useQuery({
+    queryKey: ['wallet/uiGetCurrentWallet'],
+    queryFn: () => walletPort.request('uiGetCurrentWallet'),
+    useErrorBoundary: true,
+  });
+
+  const {
+    data: walletGroup,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['getWalletGroupByAddress', currentWallet?.address],
+    queryFn: () =>
+      walletPort.request('getWalletGroupByAddress', {
+        address: currentWallet?.address as string,
+      }),
+    enabled: !!currentWallet?.address,
+    useErrorBoundary: false,
+  });
+
+  // Extract all addresses from the wallet group
+  const allAddresses = useMemo(() => {
+    if (!walletGroup) return [];
+    return walletGroup.walletContainer.wallets.map((wallet) => wallet.address);
+  }, [walletGroup]);
+
+  return {
+    currentWallet,
+    walletGroup,
+    allAddresses,
+    isLoading: !currentWallet || isLoading,
+    error,
+  };
+}
+
 export function InnerApp({ initialView, inspect }: AppProps) {
   const isOnboardingMode = urlContext.appMode === 'onboarding';
   const isPageLayout = urlContext.windowLayout === 'page';
@@ -549,22 +590,40 @@ export function InnerApp({ initialView, inspect }: AppProps) {
   const isOnboardingView =
     isOnboardingMode && initialView !== 'handshakeFailure';
 
-  const { data: wallet } = useQuery({
-    queryKey: ['wallet/uiGetCurrentWallet'],
-    queryFn: () => walletPort.request('uiGetCurrentWallet'),
-  });
+  const { currentWallet, allAddresses, isLoading, error } =
+    useCurrentWalletGroup();
+
+  const oneClickTransactionsAndGasAbstractionEnabled =
+    useIsOneClickTransactionsAndGasAbstractionEnabled();
+
+  const chainAbstractionEnabled = useIsChainAbstractionFeatureFlagEnabled();
 
   const orbyConfig = useMemo(() => {
-    const accounts = wallet
-      ? [
-          new Account(
-            validateAndFormatAddress(wallet?.address),
-            AccountType.EOA,
-            getWalletVirtualEnvironment(wallet?.address) as VMType,
-            undefined
-          ),
-        ]
-      : [];
+    let accounts: Account[] = [];
+
+    if (isLoading || error) {
+      accounts = [];
+    } else if (chainAbstractionEnabled) {
+      accounts = allAddresses.map((address) => {
+        return new Account(
+          validateAndFormatAddress(address),
+          AccountType.EOA,
+          getWalletVirtualEnvironment(address) as VMType,
+          undefined
+        );
+      });
+    } else {
+      accounts = currentWallet
+        ? [
+            new Account(
+              validateAndFormatAddress(currentWallet?.address),
+              AccountType.EOA,
+              getWalletVirtualEnvironment(currentWallet?.address) as VMType,
+              undefined
+            ),
+          ]
+        : [];
+    }
 
     return {
       instancePrivateAPIKey: process.env.ORBY_PRIVATE_API_KEY as string,
@@ -573,19 +632,15 @@ export function InnerApp({ initialView, inspect }: AppProps) {
       accounts,
       baseUrl: process.env.ORBY_BASE_URL,
     };
-  }, [wallet]);
-
-  const oneClickTransactionsAndGasAbstractionEnabled =
-    useIsOneClickTransactionsAndGasAbstractionEnabled();
+  }, [isLoading, error, chainAbstractionEnabled, allAddresses, currentWallet]);
 
   return (
     <>
       <OrbyProvider config={orbyConfig}>
         <Router>
           <ErrorBoundary renderError={(error) => <ViewError error={error} />}>
-            {oneClickTransactionsAndGasAbstractionEnabled && (
-              <RegisterSessions />
-            )}
+            {(oneClickTransactionsAndGasAbstractionEnabled ||
+              chainAbstractionEnabled) && <RegisterSessions />}
             <InactivityDetector />
             <SessionResetHandler />
             <TurnstileTokenHandler />

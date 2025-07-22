@@ -1303,11 +1303,12 @@ export class Wallet {
   }
 
   async signTypedData({
-    params: { typedData: rawTypedData },
+    params: { typedData: rawTypedData, address },
   }: WalletMethodParams<{
     typedData: TypedData | string;
+    address: string;
   }>) {
-    const signer = this.getOfflineSigner();
+    const signer = this.getOfflineSignerByAddress(address);
     const signature = signTypedData(rawTypedData, signer);
     return signature;
   }
@@ -1334,7 +1335,6 @@ export class Wallet {
       );
     }
 
-    const chainId = normalizeTransactionChainId(incomingTransaction);
     const transaction = prepareTransaction(incomingTransaction);
     const paymasterEligible = Boolean(transaction.customData?.paymasterParams);
 
@@ -1354,7 +1354,9 @@ export class Wallet {
       }
     } else {
       try {
-        const signer = await this.getSigner(chainId as ChainId);
+        const signer = this.getOfflineSignerByAddress(
+          transaction.from as string
+        );
         const signature = await signer.signTransaction(transaction);
         return signature;
       } catch (error) {
@@ -1367,12 +1369,12 @@ export class Wallet {
     params,
   }: WalletMethodParams<{
     transaction: StringBase64;
+    address: string;
   }>): Promise<SolSignTransactionResult> {
     this.ensureRecord(this.record);
-    const currentAddress = this.ensureCurrentAddress();
+    this.ensureRecord(this.record);
     const transaction = solFromBase64(params.transaction);
-
-    const keypair = this.getKeypairByAddress(currentAddress);
+    const keypair = this.getKeypairByAddress(params.address);
     const result = SolanaSigning.signTransaction(transaction, keypair);
 
     return result;
