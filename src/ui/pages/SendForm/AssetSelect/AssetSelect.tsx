@@ -42,6 +42,7 @@ import { useCurrency } from 'src/modules/currency/useCurrency';
 import GasIcon from 'jsx:src/ui/assets/gas.svg';
 import { useNetworks } from 'src/modules/networks/useNetworks';
 import type { BareAddressPosition } from 'src/shared/types/BareAddressPosition';
+import { useIsChainAbstractionEnabled } from 'src/shared/core/useIsChainAbstractionEnabled';
 import * as styles from './styles.module.css';
 
 function ResultItem({
@@ -454,12 +455,18 @@ function AssetSelectComponent({
     }, 100);
   }, [firstItem, selectItem, setHighlightedIndex]);
 
-  const assetExistsOnChain =
-    chain &&
-    getAssetImplementationInChain({
-      asset: selectedItem.asset,
-      chain,
-    });
+  const isChainAbstractionEnabled = useIsChainAbstractionEnabled();
+
+  const assetExistsOnChain = useMemo(() => {
+    if (isChainAbstractionEnabled) {
+      return true;
+    }
+
+    return (
+      chain &&
+      getAssetImplementationInChain({ asset: selectedItem.asset, chain })
+    );
+  }, [chain, selectedItem.asset, isChainAbstractionEnabled]);
 
   const { networks } = useNetworks();
   const gasAssetId = useMemo(() => {

@@ -71,7 +71,7 @@ import { PageBottom } from 'src/ui/components/PageBottom';
 import { whiteBackgroundKind } from 'src/ui/components/Background/Background';
 import { useGasbackEstimation } from 'src/modules/ethereum/account-abstraction/rewards';
 import type { QuotesData } from 'src/ui/shared/requests/useQuotes';
-import { useQuotes2 } from 'src/ui/shared/requests/useQuotes';
+import { useSortedQuotes } from 'src/ui/shared/requests/useSortedQuotes';
 import type { Quote2 } from 'src/shared/types/Quote';
 import {
   toIncomingTransaction,
@@ -127,19 +127,6 @@ import { LabeledNetworkSelect } from './LabeledNetworkSelect';
 import { BridgeLine } from './BridgeLine';
 import { ZerionFeeLine } from './ZerionFeeLine';
 import { ReceiverAddressField } from './ReceiverAddressField';
-
-function useSortedQuotes(params: Parameters<typeof useQuotes2>[0]) {
-  return {
-    quotesByAmount: useQuotes2({
-      ...params,
-      formState: { ...params.formState, sort: '1' },
-    }),
-    quotesByTime: useQuotes2({
-      ...params,
-      formState: { ...params.formState, sort: '2' },
-    }),
-  };
-}
 
 const rootNode = getRootDomNode();
 

@@ -97,12 +97,13 @@ import { isMatchForEcosystem } from 'src/shared/wallet/shared';
 import { Networks } from 'src/modules/networks/Networks';
 import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
 import {
+  useGetFungibleTokenBalances,
   useGetFungibleTokenPortfolio,
   useGetOperationsToSignTransactionOrSignTypedData,
   useOrby,
 } from '@orb-labs/orby-react';
 import type { OperationStatus } from '@orb-labs/orby-core';
-import { OperationStatusType } from '@orb-labs/orby-core';
+import { OperationStatusType, VMType } from '@orb-labs/orby-core';
 import {
   signTransaction,
   signTypedData,
@@ -110,6 +111,12 @@ import {
 } from 'src/shared/core/orb';
 import _ from 'lodash';
 import { useOperationSetError } from 'src/ui/shared/hooks/useOperationSetError';
+import {
+  createChainAddressToStandardizedBalanceMap,
+  processUnifiedPositions,
+} from 'src/shared/converters';
+import { useIsChainAbstractionEnabled } from 'src/shared/core/useIsChainAbstractionEnabled';
+import { useSortedQuotes } from 'src/ui/shared/requests/useSortedQuotes';
 import { NetworkSelect } from '../Networks/NetworkSelect';
 import { TransactionConfiguration } from '../SendTransaction/TransactionConfiguration';
 import { txErrorToMessage } from '../SendTransaction/shared/transactionErrorToMessage';
@@ -291,7 +298,10 @@ type HandleChangeFunction = <K extends keyof SwapFormState>(
   value: SwapFormState[K]
 ) => void;
 
-function reverseTokens(state: SwapFormState) {
+function reverseTokens(
+  state: SwapFormState,
+  allPositions?: AddressPosition[] | null | undefined
+) {
   const { outputFungibleId, inputFungibleId } = state;
   const newState: SwapFormState = {};
   if (outputFungibleId) {
@@ -300,22 +310,54 @@ function reverseTokens(state: SwapFormState) {
   if (inputFungibleId) {
     newState.outputFungibleId = inputFungibleId;
   }
+
+  const inputChain = allPositions?.find(
+    (p) => p.asset.id == newState.inputFungibleId
+  )?.chain;
+
+  if (inputChain) {
+    newState.inputChain = inputChain;
+  }
+
+  const outputChain = allPositions?.find(
+    (p) => p.asset.id == newState.outputFungibleId
+  )?.chain;
+
+  if (outputChain) {
+    newState.outputChain = outputChain;
+  }
+
   return newState;
 }
 
 function changeAssetId<K extends keyof SwapFormState>(
   state: SwapFormState,
   key: K,
-  value: SwapFormState[K]
+  value: SwapFormState[K],
+  allPositions?: AddressPosition[] | null | undefined
 ) {
   const isSameAsOpposite =
     (key === 'inputFungibleId' && value === state.outputFungibleId) ||
     (key === 'outputFungibleId' && value === state.inputFungibleId);
   if (isSameAsOpposite) {
-    const newState = reverseTokens(state);
+    const newState = reverseTokens(state, allPositions);
     newState[key] = value;
     return newState;
   } else {
+    if (key === 'inputFungibleId') {
+      const inputChain = allPositions?.find((p) => p.asset.id == value)?.chain;
+
+      if (inputChain) {
+        return { [key]: value, inputChain };
+      }
+    } else if (key === 'outputFungibleId') {
+      const outputChain = allPositions?.find((p) => p.asset.id == value)?.chain;
+
+      if (outputChain) {
+        return { [key]: value, outputChain };
+      }
+    }
+
     return { [key]: value };
   }
 }
@@ -343,18 +385,38 @@ function SwapFormComponent() {
   ] = useState<OperationStatus | undefined>(undefined);
   const [userFormState, setUserFormState] = useSearchParamsObj<SwapFormState>();
 
+  const { accountCluster } = useOrby();
+  const isChainAbstractionEnabled = useIsChainAbstractionEnabled();
+  const { preferences } = usePreferences();
+  const { fungibleTokenBalances } = useGetFungibleTokenBalances(false);
+  const { networks } = useNetworks();
+
+  const addresses = useMemo(() => {
+    if (isChainAbstractionEnabled) {
+      return (accountCluster?.accounts ?? []).map((account) => account.address);
+    }
+
+    return [singleAddressNormalized];
+  }, [
+    accountCluster?.accounts,
+    isChainAbstractionEnabled,
+    singleAddressNormalized,
+  ]);
+
   const refetchInterval = usePositionsRefetchInterval(20000);
   const httpAddressPositionsQuery = useHttpAddressPositions(
-    { addresses: [singleAddressNormalized], currency },
+    { addresses: addresses, currency },
     { source: useHttpClientSource() },
     { refetchInterval }
   );
   /** All backend-known positions across all _supported_ chains */
-  const allPositions = httpAddressPositionsQuery.data?.data || null;
+  const nonChainAbstractionPositions =
+    httpAddressPositionsQuery.data?.data || null;
   const { data: positionsOnSupportedChains } = useQuery({
-    queryKey: ['positionsOnSupportedChains', allPositions],
-    queryFn: () => filterSupportedPositionsOnSupportedChains(allPositions),
-    enabled: Boolean(allPositions),
+    queryKey: ['positionsOnSupportedChains', nonChainAbstractionPositions],
+    queryFn: () =>
+      filterSupportedPositionsOnSupportedChains(nonChainAbstractionPositions),
+    enabled: Boolean(nonChainAbstractionPositions),
     keepPreviousData: true,
   });
 
@@ -393,47 +455,153 @@ function SwapFormComponent() {
       keepPreviousData: true,
     });
 
-  const formState: SwapFormState = useMemo(
-    () => ({ ...defaultState, ...preState }),
-    [defaultState, preState]
-  );
+  const formState: SwapFormState = useMemo(() => {
+    if (isChainAbstractionEnabled) {
+      const inputFungibleId =
+        preState.inputFungibleId ?? defaultState.inputFungibleId;
+
+      const outputFungibleId =
+        preState.outputFungibleId ?? defaultState.outputFungibleId;
+
+      const inputChain = nonChainAbstractionPositions?.find(
+        (p) => p.asset.id == inputFungibleId
+      )?.chain;
+
+      const outputChain = nonChainAbstractionPositions?.find(
+        (p) => p.asset.id == outputFungibleId
+      )?.chain;
+
+      if (inputChain && outputChain) {
+        return { ...defaultState, ...preState, inputChain, outputChain };
+      } else if (inputChain) {
+        return { ...defaultState, ...preState, inputChain };
+      } else if (outputChain) {
+        return { ...defaultState, ...preState, outputChain };
+      } else {
+        return { ...defaultState, ...preState };
+      }
+    }
+
+    return { ...defaultState, ...preState };
+  }, [
+    isChainAbstractionEnabled,
+    defaultState,
+    preState,
+    nonChainAbstractionPositions,
+  ]);
 
   const handleChange = useCallback<HandleChangeFunction>(
     (key, value) => setUserFormState((state) => ({ ...state, [key]: value })),
     [setUserFormState]
   );
 
+  // Create a map of {chainId}+{address} to StandardizedBalance
+  const chainAddressToStandardizedBalanceMap = useMemo(() => {
+    return createChainAddressToStandardizedBalanceMap(fungibleTokenBalances);
+  }, [fungibleTokenBalances]);
+
+  const allPositions = useMemo(() => {
+    if (isChainAbstractionEnabled) {
+      return processUnifiedPositions({
+        positions: nonChainAbstractionPositions || undefined,
+        chainAddressToStandardizedBalanceMap,
+        networks: networks || undefined,
+      });
+    }
+
+    return nonChainAbstractionPositions;
+  }, [
+    isChainAbstractionEnabled,
+    nonChainAbstractionPositions,
+    chainAddressToStandardizedBalanceMap,
+    networks,
+  ]);
+
+  const availablePositions = useMemo(() => {
+    if (isChainAbstractionEnabled) {
+      return sortPositionsByValue(allPositions);
+    }
+
+    const positions = allPositions
+      ?.filter((p) => p.chain === preferences?.selectedChain?.toString())
+      .filter((p) => p.type === 'asset');
+
+    return sortPositionsByValue(positions);
+  }, [allPositions, preferences, isChainAbstractionEnabled]);
+
   /** Same as handleChange, but reverses tokens if selected asset is same as the opposite one */
   const handleAssetChange = useEvent<HandleChangeFunction>((key, value) => {
     setUserFormState((state) => ({
       ...state,
-      ...changeAssetId(formState, key, value),
+      ...changeAssetId(formState, key, value, availablePositions),
     }));
   });
 
-  const { inputAmount, inputFungibleId, inputChain, outputFungibleId } =
-    formState;
+  const { inputAmount, inputFungibleId, outputFungibleId } = formState;
+  const { inputChainId, inputChain, outputChain } = useMemo(() => {
+    const inputChain = formState.inputChain
+      ? createChain(formState.inputChain)
+      : null;
 
-  const availablePositions = useMemo(() => {
-    const positions = allPositions
-      ?.filter((p) => p.chain === inputChain)
-      .filter((p) => p.type === 'asset');
-    return sortPositionsByValue(positions);
-  }, [allPositions, inputChain]);
+    const outputChain = formState.outputChain
+      ? createChain(formState.outputChain)
+      : inputChain;
 
-  const spendChain = inputChain ? createChain(inputChain) : null;
-  const { data: network } = useNetworkConfig(inputChain ?? null);
+    const id =
+      inputChain?.value == 'solana'
+        ? 101
+        : inputChain?.value && networks
+        ? networks.getChainId(inputChain)
+        : null;
+
+    return {
+      inputChainId: id ? BigInt(id) : undefined,
+      inputChain: inputChain,
+      outputChain,
+    };
+  }, [formState.inputChain, formState.outputChain, networks]);
+
+  const isOrbyEnabled = useIsOrbyEnabled(inputChainId);
+  const getPortFolioParams = useMemo(() => {
+    if (isChainAbstractionEnabled) {
+      return {
+        isTestnetMode: preferences?.testnetMode?.on,
+        chainId: undefined,
+      };
+    }
+
+    return { isTestnetMode: undefined, inputChainId };
+  }, [isChainAbstractionEnabled, inputChainId, preferences]);
+
+  const { data: network } = useNetworkConfig(inputChain?.value ?? null);
 
   const inputPosition = usePosition({
     assetId: inputFungibleId ?? null,
-    positions: allPositions,
-    chain: spendChain,
+    positions: allPositions ?? null,
+    chain: inputChain,
   });
   const outputPosition = usePosition({
     assetId: outputFungibleId ?? null,
-    positions: allPositions,
-    chain: spendChain,
+    positions: allPositions ?? null,
+    chain: outputChain,
   });
+
+  const { fungibleTokens } = useGetFungibleTokenPortfolio(
+    getPortFolioParams.isTestnetMode,
+    getPortFolioParams.chainId
+  );
+
+  const [selectedGasToken, setSelectedGasToken] = useState<GasTokenInput>({
+    name: 'Native Token',
+    standardizedTokenId: undefined,
+    isDefault: true,
+  });
+
+  const gasToken = useMemo(() => {
+    return selectedGasToken?.standardizedTokenId
+      ? { standardizedTokenId: selectedGasToken.standardizedTokenId }
+      : undefined;
+  }, [selectedGasToken]);
 
   const allowanceDialogRef = useRef<HTMLDialogElementInterface | null>(null);
   const confirmDialogRef = useRef<HTMLDialogElementInterface | null>(null);
@@ -448,24 +616,58 @@ function SwapFormComponent() {
     network && isMatchForEcosystem(address, Networks.getEcosystem(network));
   const inputChainAddressMismatch = network && !inputChainAddressMatch;
 
-  const quotesData = useQuotes2({
-    address: singleAddressNormalized,
+  // Check if input and output positions are on different chains
+  const isCrossChain =
+    inputChain && outputChain && inputChain.value !== outputChain.value;
+
+  const updatedSingleAddressNormalized = useMemo(() => {
+    if (inputChain?.value === 'solana') {
+      return (
+        accountCluster?.accounts?.find(
+          (account) => account.vmType == VMType.SVM
+        )?.address ?? singleAddressNormalized
+      );
+    }
+
+    return (
+      accountCluster?.accounts?.find((account) => account.vmType == VMType.EVM)
+        ?.address ?? singleAddressNormalized
+    );
+  }, [inputChain?.value, accountCluster?.accounts, singleAddressNormalized]);
+
+  const sortedQuotes = useSortedQuotes({
+    address: updatedSingleAddressNormalized,
+    currency,
+    formState,
+    enabled: Boolean(
+      defaultStateQuery.isFetched &&
+        !defaultStateQuery.isPreviousData &&
+        isCrossChain
+    ),
+  });
+
+  const regularQuotes = useQuotes2({
+    address: updatedSingleAddressNormalized,
     currency,
     formState,
     enabled:
       defaultStateQuery.isFetched &&
       !defaultStateQuery.isPreviousData &&
-      inputChainAddressMatch,
+      inputChainAddressMatch &&
+      !isCrossChain,
   });
+
+  // Use sorted quotes for cross-chain swaps, regular quotes for same-chain swaps
+  const quotesData = isCrossChain ? sortedQuotes.quotesByAmount : regularQuotes;
   const { refetch: refetchQuotes } = quotesData;
 
   const [userQuoteId, setUserQuoteId] = useState<string | null>(null);
   useEffect(() => {
     setUserQuoteId(null);
-  }, [inputAmount, inputFungibleId, outputFungibleId, inputChain]);
+  }, [inputAmount, inputFungibleId, outputFungibleId]);
 
   const selectedQuote = useMemo(() => {
-    const userQuote = quotesData.quotes?.find(
+    const userQuote = quotesData?.quotes?.find(
       (quote) => quote.contractMetadata?.id === userQuoteId
     );
     const defaultQuote = quotesData.quotes?.[0];
@@ -480,34 +682,31 @@ function SwapFormComponent() {
     supportsSponsoredTransactions: network?.supports_sponsored_transactions,
   });
 
-  const { accountCluster } = useOrby();
-  const { networks } = useNetworks(
-    inputChain ? [inputChain.toString()] : undefined
-  );
-
-  const chain = useMemo(() => {
-    if (inputChain) {
-      return createChain(inputChain);
+  const orbyParams = useMemo(() => {
+    if (!isOrbyEnabled) {
+      return { data: '0x' };
+    } else if (selectedQuote?.transactionSwap?.evm) {
+      return {
+        data: selectedQuote?.transactionSwap?.evm?.data as string,
+        to: selectedQuote?.transactionSwap?.evm?.to as string,
+        value: selectedQuote?.transactionSwap?.evm?.value
+          ? BigInt(selectedQuote?.transactionSwap?.evm?.value?.toString())
+          : undefined,
+        entrypointAccountAddress: wallet?.address as string,
+        chainId: inputChainId,
+        gasToken,
+      };
+    } else if (selectedQuote?.transactionSwap?.solana) {
+      return {
+        data: selectedQuote?.transactionSwap?.solana as string,
+        entrypointAccountAddress: wallet?.address as string,
+        chainId: BigInt(101),
+        gasToken,
+      };
+    } else {
+      return { data: '0x' };
     }
-    return null;
-  }, [inputChain]);
-
-  const chainId = useMemo(() => {
-    const id =
-      inputChain == 'solana'
-        ? 101
-        : chain && networks
-        ? networks.getChainId(chain)
-        : null;
-
-    if (id) {
-      return BigInt(id);
-    }
-    return undefined;
-  }, [chain, inputChain, networks]);
-
-  const isOrbyEnabled = useIsOrbyEnabled(chainId);
-  const { fungibleTokens } = useGetFungibleTokenPortfolio(undefined, chainId);
+  }, [selectedQuote, isOrbyEnabled, inputChainId, wallet, gasToken]);
 
   const currentTransaction = useMemo(() => {
     if (isOrbyEnabled) {
@@ -521,44 +720,6 @@ function SwapFormComponent() {
     }
   }, [selectedQuote, isOrbyEnabled]);
 
-  const [selectedGasToken, setSelectedGasToken] = useState<GasTokenInput>({
-    name: 'Native Token',
-    standardizedTokenId: undefined,
-    isDefault: true,
-  });
-
-  const gasToken = useMemo(() => {
-    return selectedGasToken?.standardizedTokenId
-      ? { standardizedTokenId: selectedGasToken.standardizedTokenId }
-      : undefined;
-  }, [selectedGasToken]);
-
-  const orbyParams = useMemo(() => {
-    if (!isOrbyEnabled) {
-      return { data: '0x' };
-    } else if (selectedQuote?.transactionSwap?.evm) {
-      return {
-        data: selectedQuote?.transactionSwap?.evm?.data as string,
-        to: selectedQuote?.transactionSwap?.evm?.to as string,
-        value: selectedQuote?.transactionSwap?.evm?.value
-          ? BigInt(selectedQuote?.transactionSwap?.evm?.value?.toString())
-          : undefined,
-        entrypointAccountAddress: wallet?.address as string,
-        chainId,
-        gasToken,
-      };
-    } else if (selectedQuote?.transactionSwap?.solana) {
-      return {
-        data: selectedQuote?.transactionSwap?.solana as string,
-        entrypointAccountAddress: wallet?.address as string,
-        chainId: BigInt(101),
-        gasToken,
-      };
-    } else {
-      return { data: '0x' };
-    }
-  }, [selectedQuote, isOrbyEnabled, chainId, wallet, gasToken]);
-
   const {
     operationSet,
     virtualNode,
@@ -570,7 +731,7 @@ function SwapFormComponent() {
     orbyParams?.value,
     orbyParams?.entrypointAccountAddress,
     orbyParams?.chainId,
-    orbyParams.gasToken
+    orbyParams?.gasToken
   );
 
   const operationSetError = useOperationSetError(operationSet, isOrbyEnabled);
@@ -600,7 +761,7 @@ function SwapFormComponent() {
         'Approval transaction is not configured'
       );
 
-      invariant(spendChain, 'Chain must be defined to sign the tx');
+      invariant(inputChain, 'Chain must be defined to sign the tx');
       invariant(approveTxBtnRef.current, 'SignTransactionButton not found');
       invariant(inputPosition, 'Spend position must be defined');
       invariant(formState.inputAmount, 'inputAmount must be set');
@@ -614,7 +775,7 @@ function SwapFormComponent() {
 
       const inputAmountBase = commonToBase(
         formState.inputAmount,
-        getDecimals({ asset: inputPosition.asset, chain: spendChain })
+        getDecimals({ asset: inputPosition.asset, chain: inputChain })
       ).toFixed();
 
       const fallbackAddressAction = selectedQuote.transactionApprove.evm
@@ -624,13 +785,13 @@ function SwapFormComponent() {
             ),
             asset: inputPosition.asset,
             quantity: inputAmountBase,
-            chain: spendChain,
+            chain: inputChain,
           })
         : null;
 
       const txResponse = await approveTxBtnRef.current.sendTransaction({
         transaction: { evm: toIncomingTransaction(approvalTx) },
-        chain: spendChain.toString(),
+        chain: inputChain.toString(),
         initiator: INTERNAL_ORIGIN,
         clientScope: 'Swap',
         feeValueCommon: selectedQuote.networkFee?.amount.quantity ?? null,
@@ -670,7 +831,7 @@ function SwapFormComponent() {
         'Cannot submit transaction without a quote'
       );
       const { inputAmount } = formState;
-      invariant(spendChain, 'Chain must be defined to sign the tx');
+      invariant(inputChain, 'Chain must be defined to sign the tx');
       invariant(inputAmount, 'inputAmount must be set');
       invariant(
         inputPosition && outputPosition,
@@ -679,29 +840,29 @@ function SwapFormComponent() {
       invariant(sendTxBtnRef.current, 'SignTransactionButton not found');
       const inputAmountBase = commonToBase(
         inputAmount,
-        getDecimals({ asset: inputPosition.asset, chain: spendChain })
+        getDecimals({ asset: inputPosition.asset, chain: inputChain })
       ).toFixed();
       const outputAmountBase = commonToBase(
         selectedQuote.outputAmount.quantity,
-        getDecimals({ asset: outputPosition.asset, chain: spendChain })
+        getDecimals({ asset: outputPosition.asset, chain: inputChain })
       ).toFixed();
       const fallbackAddressAction = createTradeAddressAction({
         address,
         transaction: toMultichainTransaction(selectedQuote.transactionSwap),
         outgoing: [{ asset: inputPosition.asset, quantity: inputAmountBase }],
         incoming: [{ asset: outputPosition.asset, quantity: outputAmountBase }],
-        chain: spendChain,
+        chain: inputChain,
       });
 
       const txResponse = await sendTxBtnRef.current.sendTransaction({
         transaction: toMultichainTransaction(selectedQuote.transactionSwap),
-        chain: spendChain.toString(),
+        chain: inputChain.toString(),
         initiator: INTERNAL_ORIGIN,
         clientScope: 'Swap',
         feeValueCommon: selectedQuote.networkFee?.amount.quantity ?? null,
         addressAction: interpretationAction ?? fallbackAddressAction,
         quote: selectedQuote,
-        outputChain: inputChain ?? null,
+        outputChain: outputChain?.value ?? null,
       });
       return txResponse;
     },
@@ -859,7 +1020,7 @@ function SwapFormComponent() {
         height="360px"
         containerStyle={{ display: 'flex', flexDirection: 'column' }}
         renderWhenOpen={() => {
-          invariant(spendChain, 'Chain must be defined');
+          invariant(inputChain, 'Chain must be defined');
           return (
             <>
               <DialogTitle
@@ -869,7 +1030,7 @@ function SwapFormComponent() {
               />
               <Spacer height={24} />
               <SlippageSettings
-                chain={spendChain}
+                chain={inputChain}
                 configuration={toConfiguration(formState)}
                 onConfigurationChange={(value) => {
                   const partial = fromConfiguration(value);
@@ -892,7 +1053,7 @@ function SwapFormComponent() {
         renderWhenOpen={() => {
           invariant(currentTransaction, 'Tx must be defined to confirm');
           invariant(wallet, 'Current wallet not found');
-          invariant(spendChain, 'Chain must be defined');
+          invariant(inputChain, 'Chain must be defined');
 
           return (
             <ViewLoadingSuspense>
@@ -900,7 +1061,7 @@ function SwapFormComponent() {
                 formId={formId}
                 title={selectedQuote?.transactionApprove ? 'Approve' : 'Trade'}
                 wallet={wallet}
-                chain={spendChain}
+                chain={inputChain}
                 transaction={toMultichainTransaction(currentTransaction)}
                 configuration={toConfiguration(formState)}
                 customAllowanceValueBase={allowanceBase || undefined}
@@ -940,7 +1101,7 @@ function SwapFormComponent() {
         ref={allowanceDialogRef}
         height="min-content"
         renderWhenOpen={() => {
-          invariant(spendChain, 'Chain must be defined');
+          invariant(inputChain, 'Chain must be defined');
           invariant(inputAmount, 'inputAmount must be defined');
           invariant(
             inputPosition?.asset,
@@ -952,7 +1113,7 @@ function SwapFormComponent() {
           );
 
           const asset = inputPosition.asset;
-          const decimals = getDecimals({ asset, chain: spendChain });
+          const decimals = getDecimals({ asset, chain: inputChain });
           const spendAmountBase = commonToBase(inputAmount, decimals).toFixed();
           const value = new BigNumber(allowanceBase || spendAmountBase);
           const positionBalanceCommon = getPositionBalance(inputPosition);
@@ -976,7 +1137,7 @@ function SwapFormComponent() {
                 >
                   <AllowanceForm
                     asset={inputPosition.asset}
-                    chain={spendChain}
+                    chain={inputChain}
                     address={address}
                     balance={positionBalanceCommon}
                     requestedAllowanceQuantityBase={UNLIMITED_APPROVAL_AMOUNT}
@@ -1021,16 +1182,18 @@ function SwapFormComponent() {
         }}
       >
         <VStack gap={16}>
-          <NetworkSelect
-            standard={getAddressType(address)}
-            showEcosystemHint={true}
-            value={formState.inputChain ?? ''}
-            onChange={(value) => {
-              handleChange('inputChain', value);
-            }}
-            dialogRootNode={rootNode}
-            filterPredicate={(network) => network.supports_trading}
-          />
+          {!isChainAbstractionEnabled ? (
+            <NetworkSelect
+              standard={getAddressType(address)}
+              showEcosystemHint={true}
+              value={inputChain?.value ?? ''}
+              onChange={(value) => {
+                handleChange('inputChain', value);
+              }}
+              dialogRootNode={rootNode}
+              filterPredicate={(network) => network.supports_trading}
+            />
+          ) : null}
           <VStack gap={4} style={{ position: 'relative' }}>
             <div style={{ position: 'relative' }}>
               <div className={styles.arcParent}>
@@ -1048,7 +1211,7 @@ function SwapFormComponent() {
                 onClick={() =>
                   setUserFormState((state) => ({
                     ...state,
-                    ...reverseTokens(formState),
+                    ...reverseTokens(formState, availablePositions),
                   }))
                 }
               />
@@ -1083,7 +1246,7 @@ function SwapFormComponent() {
               : undefined
           }
         >
-          {inputChainAddressMismatch ? (
+          {inputChainAddressMismatch && !isChainAbstractionEnabled ? (
             <UIText kind="small/regular" color="var(--notice-600)">
               {getAddressType(address) === 'evm'
                 ? 'Please switch to an Ethereum network'
@@ -1095,17 +1258,17 @@ function SwapFormComponent() {
             selectedQuote={selectedQuote}
             onQuoteIdChange={setUserQuoteId}
           />
-          {spendChain ? (
+          {inputChain ? (
             <SlippageLine
               formState={formState}
               receiveAsset={outputPosition?.asset ?? null}
-              chain={spendChain}
+              chain={inputChain}
               outputAmount={selectedQuote?.outputAmount.quantity ?? null}
             />
           ) : null}
           {isEthereumAddress(address) &&
           currentTransaction?.evm &&
-          spendChain ? (
+          inputChain ? (
             <React.Suspense
               fallback={
                 <div style={{ display: 'flex', justifyContent: 'end' }}>
@@ -1117,7 +1280,7 @@ function SwapFormComponent() {
                 keepPreviousData={true}
                 transaction={toIncomingTransaction(currentTransaction.evm)}
                 from={address}
-                chain={spendChain}
+                chain={inputChain}
                 paymasterEligible={Boolean(
                   currentTransaction.evm.customData?.paymasterParams
                 )}

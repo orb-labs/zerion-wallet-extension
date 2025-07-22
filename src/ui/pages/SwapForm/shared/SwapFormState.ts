@@ -11,6 +11,8 @@ export type SwapFormState = {
   // from?: string;
   /** @description Recipient address for bridge transactions */
   to?: string;
+  /** @description Standardized token ID */
+  standardizedTokenId?: string;
   /** @description ID of the fungible token to swap from */
   inputFungibleId?: string;
   /** @description ID of the fungible token to swap to */

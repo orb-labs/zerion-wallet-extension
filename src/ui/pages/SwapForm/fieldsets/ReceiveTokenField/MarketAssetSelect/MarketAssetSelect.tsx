@@ -14,6 +14,7 @@ import { getAssetImplementationInChain } from 'src/modules/networks/asset';
 import { useCurrency } from 'src/modules/currency/useCurrency';
 import { useQuery } from '@tanstack/react-query';
 import type { BareAddressPosition } from 'src/shared/types/BareAddressPosition';
+import { useIsChainAbstractionEnabled } from 'src/shared/core/useIsChainAbstractionEnabled';
 import { getPopularTokens } from '../../../shared/getPopularTokens';
 
 export function MarketAssetSelect({
@@ -68,7 +69,10 @@ export function MarketAssetSelect({
     []
   );
 
-  const [searchAllNetworks, setSearchAllNetworks] = useState(false);
+  const isChainAbstractionEnabled = useIsChainAbstractionEnabled();
+  const [searchAllNetworks, setSearchAllNetworks] = useState(
+    isChainAbstractionEnabled || false
+  );
   const shouldQueryByChain = !searchAllNetworks && chain;
 
   const popularPositions = useMemo(() => {
