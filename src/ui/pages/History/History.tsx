@@ -219,7 +219,10 @@ export function HistoryList({
   const chainId = chain ? networks?.getChainId(chain) : undefined;
   const isOrbyEnabled = useIsOrbyEnabled(chainId ? BigInt(chainId) : undefined);
 
-  const { activity } = useGetActivity(preferences?.testnetMode?.on ?? false);
+  const { activity } = useGetActivity(
+    preferences?.testnetMode?.on ?? false,
+    chainId ? BigInt(chainId) : undefined
+  );
 
   const actionFilters = (
     <div style={{ paddingInline: 16 }}>
