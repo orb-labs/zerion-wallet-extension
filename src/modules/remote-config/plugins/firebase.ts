@@ -9,6 +9,7 @@ const defaultConfig: RemoteConfig = {
   extension_wallet_name_flags: {},
   extension_uninstall_link: '',
   one_click_transactions_and_gas_abstraction: true,
+  chain_abstraction_enabled: true,
   extension_loyalty_enabled: true,
   extension_asset_page_enabled: false,
   loyalty_config: {},
