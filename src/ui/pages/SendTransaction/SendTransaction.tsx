@@ -585,7 +585,10 @@ function SendTransactionContent({
   const network = networks.getByNetworkId(chain) || null;
   const source = preferences?.testnetMode?.on ? 'testnet' : 'mainnet';
 
-  const isOrbyEnabled = useIsOrbyEnabled(BigInt(populatedTransaction?.chainId));
+  const chainId = populatedTransaction?.chainId
+    ? BigInt(populatedTransaction?.chainId)
+    : undefined;
+  const isOrbyEnabled = useIsOrbyEnabled(chainId);
   const [selectedGasToken, setSelectedGasToken] = useState<GasTokenInput>({
     name: 'Native Token',
     standardizedTokenId: undefined,
@@ -603,10 +606,11 @@ function SendTransactionContent({
 
   const { operationSet, operationSetError, operationSetLoading } =
     useOrbyGetOperationsToSignTransactionOrSignTypedData(
-      populatedTransaction,
+      { evm: populatedTransaction, typedData: undefined },
       wallet,
       isOrbyEnabled,
-      selectedGasToken
+      selectedGasToken,
+      chainId
     );
 
   const paymasterPossible =

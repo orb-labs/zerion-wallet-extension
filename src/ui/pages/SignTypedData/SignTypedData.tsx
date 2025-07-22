@@ -64,14 +64,8 @@ import {
   SecurityStatusBackground,
 } from 'src/ui/shared/security-check';
 import { INTERNAL_ORIGIN } from 'src/background/constants';
-import {
-  useGetFungibleTokenPortfolio,
-  useGetOperationsToSignTransactionOrSignTypedData,
-} from '@orb-labs/orby-react';
-import {
-  CreateOperationsStatus,
-  type OnchainOperation,
-} from '@orb-labs/orby-core';
+import { useGetFungibleTokenPortfolio } from '@orb-labs/orby-react';
+import { type OnchainOperation } from '@orb-labs/orby-core';
 import type { OperationSet, StandardizedBalance } from '@orb-labs/orby-core';
 import type { Client } from 'viem';
 import type { HttpTransport } from 'viem';
@@ -79,6 +73,7 @@ import type { PublicRpcSchema } from 'viem';
 import type { OrbyActions } from '@orb-labs/orby-viem-extension';
 import _ from 'lodash';
 import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
+import { useOrbyGetOperationsToSignTransactionOrSignTypedData } from 'src/ui/shared/hooks/useOrbyGetOperationsToSignTransactionOrSignTypedData';
 import { PopoverToast } from '../Settings/PopoverToast';
 import type { PopoverToastHandle } from '../Settings/PopoverToast';
 import { txErrorToMessage } from '../SendTransaction/shared/transactionErrorToMessage';
@@ -163,7 +158,8 @@ function TypedDataDefaultView({
   const dialogRef = useRef<HTMLDialogElementInterface | null>(null);
   const [params] = useSearchParams();
   const { preferences } = usePreferences();
-  const isOrbyEnabled = useIsOrbyEnabled(BigInt(chain.value));
+  const chainId = chain && networks ? networks.getChainId(chain) : null;
+  const isOrbyEnabled = useIsOrbyEnabled(chainId ? BigInt(chainId) : undefined);
 
   const addressAction = interpretation?.action;
   const recipientAddress = addressAction?.label?.display_value.wallet_address;
@@ -541,9 +537,6 @@ function SignTypedDataContent({
   const navigate = useNavigate();
 
   const [allowanceQuantityBase, setAllowanceQuantityBase] = useState('');
-  const [operationSetError, setOperationSetError] = useState<string | null>(
-    null
-  );
 
   const typedData = useMemo(() => {
     const result = toTypedData(typedDataRaw);
@@ -585,25 +578,21 @@ function SignTypedDataContent({
     isDefault: true,
   });
 
-  const gasToken = useMemo(() => {
-    return selectedGasToken?.standardizedTokenId
-      ? { standardizedTokenId: selectedGasToken.standardizedTokenId }
-      : undefined;
-  }, [selectedGasToken]);
   const {
-    operations,
     operationSet,
+    operationSetError,
+    operationSetLoading,
+    operations,
     virtualNode,
     aggregateFee,
-    isLoading: OperationSetLoading,
-  } = useGetOperationsToSignTransactionOrSignTypedData(
-    JSON.stringify(typedData),
-    undefined,
-    undefined,
-    isOrbyEnabled ? wallet.address : undefined,
-    chainId && isOrbyEnabled ? BigInt(chainId) : undefined,
-    gasToken
+  } = useOrbyGetOperationsToSignTransactionOrSignTypedData(
+    { evm: undefined, typedData: typedDataRaw },
+    wallet,
+    isOrbyEnabled,
+    selectedGasToken,
+    chainId ? BigInt(chainId) : undefined
   );
+
   const { fungibleTokens } = useGetFungibleTokenPortfolio(
     undefined,
     chainId && isOrbyEnabled ? BigInt(chainId) : undefined
@@ -617,35 +606,6 @@ function SignTypedDataContent({
     },
     [setSelectedGasToken]
   );
-
-  React.useEffect(() => {
-    if (operationSet?.status && isOrbyEnabled) {
-      let errorMessage: string | null = null;
-
-      if (operationSet.status === CreateOperationsStatus.INSUFFICIENT_FUNDS) {
-        errorMessage = 'Insufficient funds';
-      } else if (
-        operationSet.status === CreateOperationsStatus.NO_EXECUTION_PATH
-      ) {
-        errorMessage = 'No execution path';
-      } else if (
-        operationSet.status ===
-        CreateOperationsStatus.INSUFFICIENT_FUNDS_FOR_GAS
-      ) {
-        errorMessage = 'Insufficient funds for gas. Choose another token';
-      } else if (operationSet.status === CreateOperationsStatus.INTERNAL) {
-        errorMessage = 'Internal error';
-      } else if (
-        operationSet.status === CreateOperationsStatus.INVALID_ARGUMENT
-      ) {
-        errorMessage = 'Invalid argument';
-      }
-
-      setOperationSetError(errorMessage);
-    } else {
-      setOperationSetError(null);
-    }
-  }, [operationSet?.status, isOrbyEnabled]);
 
   const { data: interpretation, ...interpretQuery } = useQuery({
     queryKey: [
@@ -712,7 +672,7 @@ function SignTypedDataContent({
             operationSet={operationSet}
             operations={operations}
             virtualNode={virtualNode}
-            isLoadingOperationSet={OperationSetLoading}
+            isLoadingOperationSet={operationSetLoading}
             selectedGasToken={selectedGasToken}
             setSelectedGasToken={selectGasToken}
             operationSetError={operationSetError}
