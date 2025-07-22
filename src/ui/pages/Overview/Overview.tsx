@@ -5,7 +5,7 @@ import RewardsIcon from 'jsx:src/ui/assets/rewards.svg';
 import ReadonlyIcon from 'jsx:src/ui/assets/visible.svg';
 import React, { useEffect, useMemo, useRef } from 'react';
 import { RenderArea } from 'react-area';
-import { Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
+import { Route, Routes, useLocation } from 'react-router-dom';
 import { FEATURE_LOYALTY_FLOW } from 'src/env/config';
 import { useCurrency } from 'src/modules/currency/useCurrency';
 import { updateAddressDnaInfo } from 'src/modules/dna-service/dna.client';
@@ -69,6 +69,8 @@ import { UnstyledButton } from 'src/ui/ui-kit/UnstyledButton';
 import { UnstyledLink } from 'src/ui/ui-kit/UnstyledLink';
 import { VStack } from 'src/ui/ui-kit/VStack';
 import { getAddressType } from 'src/shared/wallet/classifiers';
+import { NetworkSelectValue } from 'src/modules/networks/NetworkSelectValue';
+import { useEnableChainAbstraction } from 'src/shared/core/useEnableChainAbstraction';
 import { ViewSuspense } from '../../components/ViewSuspense';
 import { WalletAvatar } from '../../components/WalletAvatar';
 import { Feed } from '../Feed';
@@ -353,7 +355,15 @@ function OverviewComponent() {
   useBodyStyle(
     useMemo(() => ({ ['--background' as string]: 'var(--z-index-0)' }), [])
   );
+  const { preferences, setPreferences } = usePreferences();
   const { currency } = useCurrency();
+
+  const selectedChain = useMemo(() => {
+    return preferences?.selectedChain || NetworkSelectValue.Unified;
+  }, [preferences?.selectedChain]);
+
+  useEnableChainAbstraction(selectedChain);
+
   const location = useLocation();
   const {
     singleAddress: address,
@@ -368,16 +378,12 @@ function OverviewComponent() {
   });
   const isReadonlyGroup =
     walletGroup && isReadonlyContainer(walletGroup.walletContainer);
-  const [searchParams, setSearchParams] = useSearchParams();
-  const selectedChain = searchParams.get('chain') || null;
+
   const setSelectedChain = useEvent((value: string | null) => {
-    // setSearchParams is not a stable reference: https://github.com/remix-run/react-router/issues/9304
-    setSearchParams(value ? [['chain', value]] : '');
+    setPreferences({ selectedChain: value || NetworkSelectValue.Unified });
   });
+
   const addressType = getAddressType(address);
-  useEffect(() => {
-    setSelectedChain(null);
-  }, [addressType, setSelectedChain]);
   const { data, isLoading: isLoadingPortfolio } = useWalletPortfolio(
     { addresses: [params.address], currency },
     { source: useHttpClientSource() },
@@ -432,7 +438,9 @@ function OverviewComponent() {
     if (singleAddressNormalized) {
       updateAddressDnaInfo(singleAddressNormalized);
     }
-  }, [singleAddressNormalized]);
+
+    setSelectedChain(null);
+  }, [singleAddressNormalized, setSelectedChain]);
 
   const { data: isConnected } = useIsConnectedToActiveTab(
     singleAddressNormalized
@@ -450,7 +458,6 @@ function OverviewComponent() {
     </CenteredFillViewportView>
   );
 
-  const { preferences, setPreferences } = usePreferences();
   const isTestnetMode = Boolean(preferences?.testnetMode?.on);
   const isTestnetModeOnFirstRender = useRef<boolean | null>(isTestnetMode);
   useEffect(() => {
@@ -475,7 +482,10 @@ function OverviewComponent() {
                 <UnstyledButton
                   className="underline hover:no-underline"
                   onClick={() => {
-                    setPreferences({ testnetMode: null });
+                    setPreferences({
+                      testnetMode: null,
+                      selectedChain: NetworkSelectValue.Unified,
+                    });
                   }}
                 >
                   Turn off Testnet Mode
@@ -484,7 +494,10 @@ function OverviewComponent() {
                 <UnstyledButton
                   className="underline hover:no-underline"
                   onClick={() => {
-                    setPreferences({ testnetMode: { on: true } });
+                    setPreferences({
+                      testnetMode: { on: true },
+                      selectedChain: NetworkSelectValue.Unified,
+                    });
                   }}
                 >
                   Turn on Testnet Mode

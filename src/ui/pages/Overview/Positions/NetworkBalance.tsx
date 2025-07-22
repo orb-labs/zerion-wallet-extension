@@ -21,11 +21,10 @@ import { NBSP } from 'src/ui/shared/typography';
 import type { BlockchainType } from 'src/shared/wallet/classifiers';
 import { Networks } from 'src/modules/networks/Networks';
 import { NetworkId } from 'src/modules/networks/NetworkId';
+import { useIsChainAbstractionFeatureFlagEnabled } from 'src/shared/core/useIsChainAbstractionFeatureFlagEnabled';
 import { NetworkSelect } from '../../Networks/NetworkSelect';
 import { getTabScrollContentHeight, offsetValues } from '../getTabsOffset';
 import * as styles from './styles.module.css';
-
-const allNetworksString = 'All Networks';
 
 function DisclosureButton({
   value,
@@ -43,7 +42,7 @@ function DisclosureButton({
   const { networks, isLoading } = useNetworks();
   const { preferences } = usePreferences();
   const selectedNetwork =
-    value === NetworkSelectValue.All
+    value === NetworkSelectValue.All || value === NetworkSelectValue.Unified
       ? null
       : networks?.getNetworkByName(createChain(value));
 
@@ -53,14 +52,17 @@ function DisclosureButton({
       Boolean(preferences?.testnetMode?.on) &&
       !isLoading &&
       !selectedNetwork &&
-      value !== NetworkSelectValue.All,
+      value !== NetworkSelectValue.All &&
+      value !== NetworkSelectValue.Unified,
   });
 
   const network = selectedNetwork || mainnetNetwork;
 
   const selectedNetworkName =
     value === NetworkSelectValue.All
-      ? allNetworksString
+      ? 'All Networks'
+      : value === NetworkSelectValue.Unified
+      ? 'Unified'
       : network?.name || value;
 
   return (
@@ -147,16 +149,36 @@ export function NetworkBalance({
 
   const chain = temporary_solanaDisabledSelector
     ? NetworkId.Solana
-    : selectedChain || dappChain || NetworkSelectValue.All;
+    : selectedChain || dappChain || NetworkSelectValue.Unified;
 
-  const isClearableFilter = Boolean(selectedChain);
-  const showHelperButton =
-    !temporary_solanaDisabledSelector && Boolean(selectedChain || dappChain);
+  const chainAbstractionEnabled = useIsChainAbstractionFeatureFlagEnabled();
+
+  const showHelperButton = useMemo(() => {
+    if (chainAbstractionEnabled) {
+      return selectedChain !== NetworkSelectValue.Unified;
+    }
+
+    return !temporary_solanaDisabledSelector && Boolean(selectedChain);
+  }, [
+    chainAbstractionEnabled,
+    temporary_solanaDisabledSelector,
+    selectedChain,
+  ]);
+
   const showAllNetworksHelperButton =
-    (!dappChain && selectedChain !== NetworkSelectValue.All) ||
-    (dappChain && (!selectedChain || selectedChain === dappChain));
+    selectedChain !== NetworkSelectValue.Unified &&
+    selectedChain !== NetworkSelectValue.All;
 
   const hasValue = totalValue != null;
+
+  const isChainAbstractionEnabled = useIsChainAbstractionFeatureFlagEnabled();
+
+  const name = useMemo(() => {
+    if (isChainAbstractionEnabled) {
+      return NetworkSelectValue.Unified;
+    }
+    return 'All Networks';
+  }, [isChainAbstractionEnabled]);
 
   useEffect(() => {
     const handleScroll = () =>
@@ -227,9 +249,7 @@ export function NetworkBalance({
           showAllNetworksOption={showAllNetworksOption}
           value={chain}
           standard={standard}
-          onChange={(selectedValue) =>
-            onChange(selectedValue === dappChain ? null : selectedValue)
-          }
+          onChange={(selectedValue) => onChange(selectedValue)}
           renderButton={({ value, openDialog }) => (
             <DisclosureButton
               value={value}
@@ -245,7 +265,7 @@ export function NetworkBalance({
           <Button
             kind="text-primary"
             onClick={() =>
-              onChange(isClearableFilter ? null : NetworkSelectValue.All)
+              onChange(showAllNetworksHelperButton ? name : dappChain)
             }
             style={{
               ['--button-text' as string]: 'var(--primary)',
@@ -254,9 +274,7 @@ export function NetworkBalance({
               textOverflow: 'ellipsis',
             }}
           >
-            {showAllNetworksHelperButton
-              ? allNetworksString
-              : dappNetwork?.name}
+            {showAllNetworksHelperButton ? name : dappNetwork?.name}
           </Button>
         ) : null}
       </HStack>

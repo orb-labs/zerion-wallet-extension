@@ -69,6 +69,7 @@ import {
 import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
 import _ from 'lodash';
 import { useOrbyGetOperationsToSignTransactionOrSignTypedData } from 'src/ui/shared/hooks/useOrbyGetOperationsToSignTransactionOrSignTypedData';
+import { NetworkSelectValue } from 'src/modules/networks/NetworkSelectValue';
 import { TransactionConfiguration } from '../SendTransaction/TransactionConfiguration';
 import { NetworkSelect } from '../Networks/NetworkSelect';
 import { txErrorToMessage } from '../SendTransaction/shared/transactionErrorToMessage';
@@ -295,6 +296,7 @@ function SendFormComponent() {
       });
       if (preferences) {
         setPreferences({
+          selectedChain: NetworkSelectValue.Unified,
           recentAddresses: updateRecentAddresses(
             to,
             preferences.recentAddresses

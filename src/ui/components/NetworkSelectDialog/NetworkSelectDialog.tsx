@@ -25,6 +25,7 @@ import { SearchInput } from 'src/ui/ui-kit/Input/SearchInput';
 import { DialogCloseButton } from 'src/ui/ui-kit/ModalDialogs/DialogTitle/DialogCloseButton';
 import { NetworkSelectValue } from 'src/modules/networks/NetworkSelectValue';
 import AllNetworksIcon from 'jsx:src/ui/assets/all-networks.svg';
+import NetworkIcon from 'jsx:src/ui/assets/network.svg';
 import { usePreferences } from 'src/ui/features/preferences/usePreferences';
 import { VirtualizedSurfaceList } from 'src/ui/ui-kit/SurfaceList/VirtualizedSurfaceList';
 import { useNativeBalance } from 'src/ui/shared/requests/useNativeBalance';
@@ -35,8 +36,9 @@ import type { BlockchainType } from 'src/shared/wallet/classifiers';
 import EcosystemEthereumIcon from 'jsx:src/ui/assets/ecosystem-ethereum.svg';
 import EcosystemSolanaIcon from 'jsx:src/ui/assets/ecosystem-solana.svg';
 import { isMatchForEcosystem } from 'src/shared/wallet/shared';
+import { useIsChainAbstractionFeatureFlagEnabled } from 'src/shared/core/useIsChainAbstractionFeatureFlagEnabled';
 import { DelayedRender } from '../DelayedRender';
-import { NetworkIcon } from '../NetworkIcon';
+import { NetworkIcon as NetworkIconComponent } from '../NetworkIcon';
 import { PageBottom } from '../PageBottom';
 import { PageColumn } from '../PageColumn';
 import { ViewLoading } from '../ViewLoading';
@@ -84,8 +86,12 @@ function NetworkItem({
 }) {
   const preferChainDistribution =
     value === NetworkSelectValue.All ||
+    value === NetworkSelectValue.Unified ||
     value in (chainDistribution?.chains || {});
-  const chain = value === NetworkSelectValue.All ? null : createChain(value);
+  const chain =
+    value === NetworkSelectValue.All || value === NetworkSelectValue.Unified
+      ? null
+      : createChain(value);
   const { currency } = useCurrency();
 
   return (
@@ -126,7 +132,12 @@ function NetworkItem({
             ecosystem
           ) ? null : preferChainDistribution ? (
             <ChainValue
-              chain={chain || NetworkSelectValue.All}
+              chain={
+                chain ||
+                (value === NetworkSelectValue.Unified
+                  ? NetworkSelectValue.Unified
+                  : NetworkSelectValue.All)
+              }
               chainDistribution={chainDistribution}
               currency={currency}
             />
@@ -157,6 +168,16 @@ function NetworkList({
   showAllNetworksOption?: boolean;
 }) {
   const { singleAddress } = useAddressParams();
+  const isChainAbstractionEnabled = useIsChainAbstractionFeatureFlagEnabled();
+  const indexOffset = useMemo(() => {
+    if (!showAllNetworksOption) {
+      return 1;
+    } else if (!isChainAbstractionEnabled) {
+      return 1;
+    }
+    return 2;
+  }, [isChainAbstractionEnabled, showAllNetworksOption]);
+
   const items = [
     title
       ? {
@@ -174,6 +195,29 @@ function NetworkList({
           ),
         }
       : null,
+    // Add Unified item above All Networks
+    isChainAbstractionEnabled
+      ? {
+          key: NetworkSelectValue.Unified,
+          isInteractive: true,
+          pad: false,
+          component: (
+            <NetworkItem
+              index={previousListLength}
+              name="Unified"
+              value={NetworkSelectValue.Unified}
+              selected={value === NetworkSelectValue.Unified}
+              chainDistribution={chainDistribution}
+              icon={
+                <NetworkIcon
+                  style={{ width: 24, height: 24 }}
+                  role="presentation"
+                />
+              }
+            />
+          ),
+        }
+      : null,
     showAllNetworksOption
       ? {
           key: NetworkSelectValue.All,
@@ -181,7 +225,7 @@ function NetworkList({
           pad: false,
           component: (
             <NetworkItem
-              index={previousListLength}
+              index={previousListLength + (isChainAbstractionEnabled ? 1 : 0)}
               name="All Networks"
               value={NetworkSelectValue.All}
               selected={value === NetworkSelectValue.All}
@@ -204,11 +248,11 @@ function NetworkList({
         pad: false,
         component: (
           <NetworkItem
-            index={previousListLength + index + (showAllNetworksOption ? 1 : 0)}
+            index={previousListLength + index + indexOffset}
             name={networks.getChainName(chain)}
             value={network.id}
             icon={
-              <NetworkIcon
+              <NetworkIconComponent
                 size={24}
                 src={network.icon_url}
                 name={network.name}

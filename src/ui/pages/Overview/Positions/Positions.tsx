@@ -152,6 +152,7 @@ function AddressPositionItem({
   const { networks } = useNetworks();
   const network = networks?.getNetworkByName(createChain(position.chain));
   const chain = createChain(position.chain);
+  const { preferences } = usePreferences();
 
   const relativeChange = (position.asset.price?.relative_change_24h || 0) / 100;
   const absoluteChange = Math.abs(
@@ -214,7 +215,8 @@ function AddressPositionItem({
                 alignItems: 'center',
               }}
             >
-              {position.chain !== NetworkId.Ethereum ? (
+              {position.chain !== NetworkId.Ethereum &&
+              preferences?.selectedChain !== NetworkSelectValue.Unified ? (
                 <NetworkIcon
                   size={16}
                   name={network?.name || null}
@@ -689,7 +691,7 @@ function MultiChainPositions({
   );
   const positions = data?.data;
 
-  const chainValue = selectedChain || dappChain || NetworkSelectValue.All;
+  const chainValue = selectedChain || dappChain || NetworkSelectValue.Unified;
 
   const items = useMemo(
     () =>
@@ -697,6 +699,7 @@ function MultiChainPositions({
         (position) =>
           (position.type === 'asset' ? position.is_displayable : true) &&
           (chainValue === NetworkSelectValue.All ||
+            chainValue === NetworkSelectValue.Unified ||
             position.chain === chainValue)
       ),
     [chainValue, positions]
@@ -712,7 +715,8 @@ function MultiChainPositions({
   }
 
   const chainTotalValue =
-    chainValue === NetworkSelectValue.All
+    chainValue === NetworkSelectValue.All ||
+    chainValue === NetworkSelectValue.Unified
       ? portfolioDecomposition?.totalValue
       : portfolioDecomposition?.positionsChainsDistribution[chainValue];
 
@@ -843,12 +847,18 @@ export function Positions({
     { enabled: ready && !addrIsSolana }
   );
   const walletPortfolio = data?.data;
-  const chainValue = selectedChain || dappChain || NetworkSelectValue.All;
+  const chainValue = selectedChain || dappChain || NetworkSelectValue.Unified;
   const chain =
-    chainValue === NetworkSelectValue.All ? null : createChain(chainValue);
+    chainValue === NetworkSelectValue.All ||
+    chainValue === NetworkSelectValue.Unified
+      ? null
+      : createChain(chainValue);
   const positionChains = useMemo(() => {
     const chainsSet = new Set(Object.keys(walletPortfolio?.chains || {}));
-    if (chainValue !== NetworkSelectValue.All) {
+    if (
+      chainValue !== NetworkSelectValue.All &&
+      chainValue !== NetworkSelectValue.Unified
+    ) {
       chainsSet.add(chainValue);
     }
     return Array.from(chainsSet);
@@ -870,7 +880,9 @@ export function Positions({
       </CenteredFillViewportView>
     );
   }
-  const moveGasPositionToFront = chainValue !== NetworkSelectValue.All;
+  const moveGasPositionToFront =
+    chainValue !== NetworkSelectValue.All &&
+    chainValue !== NetworkSelectValue.Unified;
   const OVERRIDE_POSITIONS_SUPPORT = addrIsSolana; // todo: remove when backend updates NetworkConfig for Solana
   const isSupportedByBackend =
     chain == null
@@ -898,7 +910,8 @@ export function Positions({
   );
 
   const renderEmptyViewForNetwork = () =>
-    chainValue === NetworkSelectValue.All ? (
+    chainValue === NetworkSelectValue.All ||
+    chainValue === NetworkSelectValue.Unified ? (
       <DelayedRender delay={50}>
         <VStack gap={8}>
           <div style={{ paddingInline: 16 }}>

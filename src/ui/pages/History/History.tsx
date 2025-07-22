@@ -201,9 +201,11 @@ export function HistoryList({
   const showNetworkSelector = addressType === 'evm';
   const { preferences } = usePreferences();
 
-  const chainValue = selectedChain || dappChain || NetworkSelectValue.All;
+  const chainValue = selectedChain || dappChain || NetworkSelectValue.Unified;
   const chain =
-    chainValue && chainValue !== NetworkSelectValue.All
+    chainValue &&
+    chainValue !== NetworkSelectValue.All &&
+    chainValue !== NetworkSelectValue.Unified
       ? createChain(chainValue)
       : null;
 

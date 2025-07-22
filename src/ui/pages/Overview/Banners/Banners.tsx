@@ -11,6 +11,7 @@ import { InviteFriendsBanner } from 'src/ui/features/referral-program/InviteFrie
 import { Spacer } from 'src/ui/ui-kit/Spacer';
 import { ENABLE_DNA_BANNERS } from 'src/ui/DNA/components/DnaBanners';
 import { FEATURE_LOYALTY_FLOW, FEATURE_SOLANA } from 'src/env/config';
+import { NetworkSelectValue } from 'src/modules/networks/NetworkSelectValue';
 import { SolanaBanner } from './SolanaBanner';
 
 function DnaBanners({ address }: { address: string }) {
@@ -33,7 +34,12 @@ function DnaBanners({ address }: { address: string }) {
         <>
           <MintBanner
             address={address}
-            onDismiss={() => setPreferences({ mintDnaBannerDismissed: true })}
+            onDismiss={() =>
+              setPreferences({
+                mintDnaBannerDismissed: true,
+                selectedChain: NetworkSelectValue.Unified,
+              })
+            }
           />
           <Spacer height={24} />
         </>
@@ -43,7 +49,10 @@ function DnaBanners({ address }: { address: string }) {
           <UpgradeBanner
             address={address}
             onDismiss={() =>
-              setPreferences({ upgradeDnaBannerDismissed: true })
+              setPreferences({
+                upgradeDnaBannerDismissed: true,
+                selectedChain: NetworkSelectValue.Unified,
+              })
             }
           />
           <Spacer height={24} />
@@ -76,7 +85,12 @@ export function Banners({ address }: { address: string }) {
       {solanaBannerVisible ? (
         <>
           <SolanaBanner
-            onDismiss={() => setPreferences({ solanaBannerDismissed: true })}
+            onDismiss={() =>
+              setPreferences({
+                solanaBannerDismissed: true,
+                selectedChain: NetworkSelectValue.Unified,
+              })
+            }
           />
           <Spacer height={24} />
         </>
@@ -84,7 +98,10 @@ export function Banners({ address }: { address: string }) {
         <>
           <InviteFriendsBanner
             onDismiss={() =>
-              setPreferences({ invitationBannerDismissed: true })
+              setPreferences({
+                invitationBannerDismissed: true,
+                selectedChain: NetworkSelectValue.Unified,
+              })
             }
           />
           <Spacer height={24} />
