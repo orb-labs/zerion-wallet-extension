@@ -192,13 +192,14 @@ export function NonFungibleTokens({
     currency,
   });
   const { value: nftTotalValue } = useNftsTotalValue(params);
-  const chainValue = selectedChain || dappChain || NetworkSelectValue.All;
+  const chainValue = selectedChain || dappChain || NetworkSelectValue.Unified;
   const addressType = getAddressType(address);
   const showNetworkSelector = addressType === 'evm';
 
   // Derive a canonical chain to check nft support if current chain value is "all"
   const referenceChain =
-    chainValue === NetworkSelectValue.All
+    chainValue === NetworkSelectValue.All ||
+    chainValue === NetworkSelectValue.Unified
       ? isSolanaAddress(singleAddressNormalized)
         ? NetworkId.Solana
         : NetworkId.Ethereum
@@ -216,7 +217,9 @@ export function NonFungibleTokens({
     {
       ...params,
       chains:
-        isSupportedByBackend && chainValue !== NetworkSelectValue.All
+        isSupportedByBackend &&
+        chainValue !== NetworkSelectValue.All &&
+        chainValue !== NetworkSelectValue.Unified
           ? [chainValue]
           : undefined,
       currency,
@@ -236,7 +239,8 @@ export function NonFungibleTokens({
   }
 
   const nftChainValue =
-    chainValue === NetworkSelectValue.All
+    chainValue === NetworkSelectValue.All ||
+    chainValue === NetworkSelectValue.Unified
       ? nftTotalValue
       : nftDistribution?.floor_price[chainValue];
 

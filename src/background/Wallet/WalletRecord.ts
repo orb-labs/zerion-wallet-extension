@@ -30,6 +30,7 @@ import { encodeForMasking } from 'src/shared/wallet/encode-locally';
 import { isSolanaAddress } from 'src/modules/solana/shared';
 import type { AtLeastOneOf } from 'src/shared/type-utils/OneOf';
 import type { BlockchainType } from 'src/shared/wallet/classifiers';
+import { NetworkSelectValue } from 'src/modules/networks/NetworkSelectValue';
 import type { Credentials, SessionCredentials } from '../account/Credentials';
 import { emitter } from '../events';
 import type {
@@ -299,7 +300,9 @@ export class WalletRecordModel {
         },
         transactions: [],
         permissions: {},
-        publicPreferences: {},
+        publicPreferences: {
+          selectedChain: NetworkSelectValue.Unified,
+        },
         activityRecord: {},
         feed: { completedAbilities: [], dismissedAbilities: [] },
       };
@@ -845,6 +848,7 @@ export class WalletRecordModel {
     const defaults: Required<WalletRecord['publicPreferences']> = {
       showNetworkSwitchShortcut: true,
       overviewChain: '',
+      selectedChain: NetworkSelectValue.Unified,
       configurableNonce: false,
       invitationBannerDismissed: false,
       recentAddresses: [],

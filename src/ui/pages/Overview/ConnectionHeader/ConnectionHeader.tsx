@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import SettingsIcon from 'jsx:src/ui/assets/filters.svg';
 import { invariant } from 'src/shared/invariant';
@@ -15,10 +21,11 @@ import { useAddressParams } from 'src/ui/shared/user-address/useAddressParams';
 import { VStack } from 'src/ui/ui-kit/VStack';
 import { UIText } from 'src/ui/ui-kit/UIText';
 import { walletPort } from 'src/ui/shared/channels';
-import { requestChainForOrigin } from 'src/ui/shared/requests/requestChainForOrigin';
 import { NetworkIcon } from 'src/ui/components/NetworkIcon';
+import NetworkIconSvg from 'jsx:src/ui/assets/network.svg';
 import ArrowDownIcon from 'jsx:src/ui/assets/caret-down-filled.svg';
 import { createChain } from 'src/modules/networks/Chain';
+import { NetworkSelectValue } from 'src/modules/networks/NetworkSelectValue';
 import { INTERNAL_ORIGIN } from 'src/background/constants';
 import {
   useMainnetNetwork,
@@ -31,6 +38,7 @@ import { isEthereumAddress } from 'src/shared/isEthereumAddress';
 import { getAddressType } from 'src/shared/wallet/classifiers';
 import { isMatchForEcosystem } from 'src/shared/wallet/shared';
 import { Networks } from 'src/modules/networks/Networks';
+import { useEnableChainAbstraction } from 'src/shared/core/useEnableChainAbstraction';
 import { ConnectedSiteDialog } from '../../ConnectedSites/ConnectedSite';
 import { NetworkSelect } from '../../Networks/NetworkSelect';
 import { isConnectableDapp } from '../../ConnectedSites/shared/isConnectableDapp';
@@ -47,14 +55,18 @@ function NetworksDisclosureButton({
 }) {
   const { networks, isLoading } = useNetworks();
   const { preferences } = usePreferences();
-  const selectedNetwork = networks?.getNetworkByName(createChain(value));
+  const selectedNetwork =
+    value === NetworkSelectValue.Unified
+      ? null
+      : networks?.getNetworkByName(createChain(value));
 
   const { data: mainnetNetwork } = useMainnetNetwork({
     chain: value,
     enabled:
       Boolean(preferences?.testnetMode?.on) && !isLoading && !selectedNetwork,
   });
-  const chain = createChain(value);
+  const chain =
+    value === NetworkSelectValue.Unified ? null : createChain(value);
   const network = selectedNetwork || mainnetNetwork;
 
   if (isLoading) {
@@ -77,7 +89,9 @@ function NetworksDisclosureButton({
       className="parent-hover"
     >
       <HStack gap={8} alignItems="center">
-        {network ? (
+        {value === NetworkSelectValue.Unified ? (
+          <NetworkIconSvg style={{ width: 24, height: 24 }} />
+        ) : network ? (
           <NetworkIcon size={24} src={network.icon_url} name={network.name} />
         ) : null}
         <span
@@ -94,7 +108,9 @@ function NetworksDisclosureButton({
               textOverflow: 'ellipsis',
             }}
           >
-            {network?.name || capitalize(String(chain))}
+            {value === NetworkSelectValue.Unified
+              ? 'Unified'
+              : network?.name || capitalize(String(chain))}
           </span>
           <ArrowDownIcon
             className="content-hover"
@@ -127,17 +143,12 @@ export function ConnectionHeader() {
   const { singleAddressNormalized: address } = useAddressParams();
   const { data: isConnected } = useIsConnectedToActiveTab(address);
 
-  const { data: siteChain, ...chainQuery } = useQuery({
-    queryKey: ['requestChainForOrigin', activeTabOrigin, address],
-    queryFn: async () => {
-      if (activeTabOrigin) {
-        return requestChainForOrigin(activeTabOrigin, getAddressType(address));
-      }
-    },
-    enabled: Boolean(activeTabOrigin),
-    useErrorBoundary: true,
-    suspense: false,
-  });
+  const { preferences, setPreferences } = usePreferences();
+  const selectedChain = useMemo(() => {
+    return preferences?.selectedChain || NetworkSelectValue.Unified;
+  }, [preferences?.selectedChain]);
+
+  useEnableChainAbstraction(selectedChain);
 
   const switchChainMutation = useMutation({
     mutationFn: ({ chain, origin }: { chain: string; origin: string }) => {
@@ -156,7 +167,9 @@ export function ConnectionHeader() {
       }
     },
     useErrorBoundary: true,
-    onSuccess: () => chainQuery.refetch(),
+    onSuccess: (_, { chain }) => {
+      setPreferences({ selectedChain: chain || NetworkSelectValue.Unified });
+    },
   });
 
   const isConnectableSite = tabData?.url
@@ -270,11 +283,13 @@ export function ConnectionHeader() {
                     Connected
                   </UIText>
                 </VStack>
-                {siteChain ? (
+                {preferences?.selectedChain ? (
                   <NetworkSelect
                     standard={getAddressType(address)}
                     showEcosystemHint={true}
-                    value={siteChain.toString()}
+                    value={
+                      preferences?.selectedChain || NetworkSelectValue.Unified
+                    }
                     filterPredicate={(network) =>
                       isMatchForEcosystem(
                         address,

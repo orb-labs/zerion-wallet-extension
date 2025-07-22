@@ -4,6 +4,7 @@ import {
   ETHEREUM_CHAIN_SOURCES,
   networksStore,
 } from 'src/modules/networks/networks-store.client.mock';
+import { NetworkSelectValue } from 'src/modules/networks/NetworkSelectValue';
 import { normalizeAddress } from 'src/shared/normalizeAddress';
 import type { BareWallet } from 'src/shared/types/BareWallet';
 import type { GlobalPreferences } from 'src/shared/types/GlobalPreferences';
@@ -51,6 +52,7 @@ const mockRecord: WalletRecord = {
     overviewChain: '',
     configurableNonce: true,
     invitationBannerDismissed: false,
+    selectedChain: NetworkSelectValue.Unified,
   },
   permissions: mockedPermissions,
   transactions: [],

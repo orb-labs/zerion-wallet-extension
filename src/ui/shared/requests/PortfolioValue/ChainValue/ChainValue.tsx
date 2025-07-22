@@ -14,12 +14,12 @@ export function ChainValue({
   chain,
   currency,
 }: {
-  chain: Chain | NetworkSelectValue.All;
+  chain: Chain | NetworkSelectValue.All | NetworkSelectValue.Unified;
   chainDistribution: ChainDistribution | null;
   currency: string;
 }) {
   const value =
-    chain === NetworkSelectValue.All
+    chain === NetworkSelectValue.All || chain === NetworkSelectValue.Unified
       ? chainDistribution?.totalValue
       : chainDistribution?.positionsChainsDistribution[chain.toString()];
 

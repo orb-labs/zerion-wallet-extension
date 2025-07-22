@@ -40,6 +40,11 @@ interface PublicPreferences {
   /** @deprecated */
   overviewChain?: string;
   /**
+   * The user's selected network chain for portfolio filtering
+   * Defaults to "unified" when not set
+   */
+  selectedChain?: string;
+  /**
    * Allow to configure nonce before signing transactions
    */
   configurableNonce?: boolean;
