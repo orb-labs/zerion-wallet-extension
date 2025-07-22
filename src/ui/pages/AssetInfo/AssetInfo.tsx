@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { NavigationType, useNavigationType, useParams } from 'react-router-dom';
 import { useCurrency } from 'src/modules/currency/useCurrency';
 import { invariant } from 'src/shared/invariant';
@@ -35,6 +35,10 @@ import { useCopyToClipboard } from 'src/ui/shared/useCopyToClipboard';
 import { UnstyledButton } from 'src/ui/ui-kit/UnstyledButton';
 import type { PopoverToastHandle } from 'src/ui/pages/Settings/PopoverToast';
 import { PopoverToast } from 'src/ui/pages/Settings/PopoverToast';
+import { useGetFungibleTokenBalances } from '@orb-labs/orby-react';
+import type { StandardizedBalance } from '@orb-labs/orby-core';
+import type { WalletAssetDetails } from 'src/modules/zerion-api/requests/wallet-get-asset-details';
+import { findNetworkByChainId } from 'src/modules/networks/networks-fallback';
 import { AssetHistory } from './AssetHistory';
 import { AssetAddressStats } from './AssetAddressDetails';
 import { AssetGlobalStats } from './AssetGlobalStats';
@@ -46,6 +50,72 @@ import {
 } from './AssetHeader';
 import { AssetDescription } from './AssetDescription';
 import * as styles from './styles.module.css';
+
+/**
+ * Converts tokensInfo (StandardizedBalance) into walletAssetDetails format,
+ * using walletData to fill missing data from tokensInfo
+ */
+function convertTokensInfoToWalletAssetDetails(
+  tokensInfo: StandardizedBalance | undefined,
+  walletData: WalletAssetDetails | undefined
+): WalletAssetDetails | undefined {
+  if (!tokensInfo) {
+    return walletData;
+  }
+
+  if (!walletData) {
+    // If no walletData, create a minimal structure from tokensInfo
+    const totalValue = Number(tokensInfo.totalValueInFiat?.toExact()) || 0;
+    const totalConvertedQuantity = Number(
+      tokensInfo.total.toRawAmount().toString()
+    );
+
+    return {
+      chainsDistribution: null,
+      wallets: [],
+      apps: null,
+      totalValue,
+      totalConvertedQuantity,
+    };
+  }
+
+  // Use walletData as base and enhance with tokensInfo data
+  const enhancedWalletData: WalletAssetDetails = {
+    ...walletData,
+    // Update total values with tokensInfo data if available
+    totalValue:
+      Number(tokensInfo.totalValueInFiat?.toExact()) || walletData.totalValue,
+    totalConvertedQuantity:
+      Number(tokensInfo.total.toRawAmount().toString()) ||
+      walletData.totalConvertedQuantity,
+  };
+
+  enhancedWalletData.chainsDistribution = tokensInfo.tokenBalancesOnChains
+    .map((tokenBalance) => {
+      const chainId = tokenBalance.token.chainId.toString();
+
+      // Find the network config using the helper function
+      const networkConfig = findNetworkByChainId(chainId);
+
+      return {
+        chain: {
+          id: networkConfig?.id || chainId,
+          name: networkConfig?.name || `Chain ${chainId}`,
+          iconUrl: networkConfig?.icon_url || '',
+          testnet: networkConfig?.is_testnet || false,
+        },
+        value: Number(tokenBalance.toExact()) || 0,
+        percentageAllocation:
+          tokensInfo.total.toRawAmount() === BigInt(0)
+            ? 0
+            : (100 * Number(tokenBalance.toExact())) /
+              Number(tokensInfo.total.toExact()),
+      };
+    })
+    .sort((a, b) => b.percentageAllocation - a.percentageAllocation);
+
+  return enhancedWalletData;
+}
 
 function ReportAssetLink({ asset }: { asset: Asset }) {
   return (
@@ -101,7 +171,7 @@ function ShareAssetLink({ asset }: { asset: Asset }) {
 }
 
 export function AssetInfo() {
-  const { asset_code } = useParams();
+  const { asset_code, standardizedTokenId } = useParams();
   invariant(asset_code, 'Asset Code is required');
   const navigationType = useNavigationType();
   useEffect(() => {
@@ -110,6 +180,17 @@ export function AssetInfo() {
     }
   }, [navigationType]);
   useBackgroundKind(whiteBackgroundKind);
+
+  const { fungibleTokenBalances, isLoading: isLoadingFungibleTokenBalances } =
+    useGetFungibleTokenBalances(
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      [standardizedTokenId ?? '']
+    );
 
   const { currency } = useCurrency();
   const { data: assetFullInfoData, isLoading } = useAssetFullInfo(
@@ -155,10 +236,27 @@ export function AssetInfo() {
     },
   });
 
-  const chainWithTheBiggestBalance =
-    walletData?.data?.chainsDistribution?.at(0)?.chain.id || NetworkId.Zero;
+  const tokensInfo = useMemo(() => {
+    return fungibleTokenBalances?.find(
+      (balance) => balance.standardizedTokenId === standardizedTokenId
+    );
+  }, [fungibleTokenBalances, standardizedTokenId]);
 
-  if (isLoading || !wallet || !walletData) {
+  // Convert tokensInfo to walletAssetDetails format
+  const convertedWalletAssetDetails = useMemo(() => {
+    return convertTokensInfoToWalletAssetDetails(tokensInfo, walletData?.data);
+  }, [tokensInfo, walletData?.data]);
+
+  const chainWithTheBiggestBalance =
+    convertedWalletAssetDetails?.chainsDistribution?.at(0)?.chain.id ||
+    NetworkId.Zero;
+
+  if (
+    isLoading ||
+    !wallet ||
+    !convertedWalletAssetDetails ||
+    isLoadingFungibleTokenBalances
+  ) {
     return (
       <>
         <NavigationTitle title={null} documentTitle={`${asset_code} - info`} />
@@ -172,7 +270,7 @@ export function AssetInfo() {
   invariant(assetFullInfo?.fungible, 'Fungible asset info is missing');
 
   const isWatchedAddress = isReadonlyAccount(wallet);
-  const isEmptyBalance = walletData?.data.totalValue === 0;
+  const isEmptyBalance = convertedWalletAssetDetails.totalValue === 0;
 
   const chainForSwap = isEmptyBalance
     ? assetFullInfo.extra.mainChain
@@ -210,7 +308,7 @@ export function AssetInfo() {
           address={params.address}
           wallet={wallet}
           assetFullInfo={assetFullInfo}
-          walletAssetDetails={walletData.data}
+          walletAssetDetails={convertedWalletAssetDetails}
           assetAddressPnlQuery={assetAddressPnlQuery}
         />
         <AssetResources assetFullInfo={assetFullInfo} />
@@ -240,8 +338,8 @@ export function AssetInfo() {
               as={UnstyledLink}
               to={
                 isEmptyBalance
-                  ? `/swap-form?inputChain=${chainForSwap}&outputFungibleId=${asset_code}`
-                  : `/swap-form?inputChain=${chainForSwap}&inputFungibleId=${asset_code}`
+                  ? `/swap-form?inputChain=${chainForSwap}&outputFungibleId=${asset_code}&standardizedTokenId=${standardizedTokenId}`
+                  : `/swap-form?inputChain=${chainForSwap}&inputFungibleId=${asset_code}&standardizedTokenId=${standardizedTokenId}`
               }
             >
               <HStack gap={8} alignItems="center" justifyContent="center">
@@ -255,7 +353,7 @@ export function AssetInfo() {
                   as={UnstyledLink}
                   kind="primary"
                   size={48}
-                  to={`/send-form?tokenAssetCode=${asset_code}&tokenChain=${chainWithTheBiggestBalance}`}
+                  to={`/send-form?tokenAssetCode=${asset_code}&tokenChain=${chainWithTheBiggestBalance}&standardizedTokenId=${standardizedTokenId}`}
                   style={{ padding: 14 }}
                   aria-label="Send Token"
                 >
@@ -264,7 +362,7 @@ export function AssetInfo() {
                 <Button
                   kind="primary"
                   as={UnstyledLink}
-                  to={`/bridge-form?inputFungibleId=${asset_code}&inputChain=${chainWithTheBiggestBalance}`}
+                  to={`/bridge-form?inputFungibleId=${asset_code}&inputChain=${chainWithTheBiggestBalance}&standardizedTokenId=${standardizedTokenId}`}
                   size={48}
                   style={{ padding: 14 }}
                   aria-label="Bridge Token"

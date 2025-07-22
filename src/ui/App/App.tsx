@@ -271,7 +271,7 @@ function Views({ initialRoute }: { initialRoute?: string }) {
             }
           />
           <Route
-            path="/asset/:asset_code"
+            path="/asset/:asset_code/:standardizedTokenId"
             element={
               <RequireAuth>
                 <AssetInfo />

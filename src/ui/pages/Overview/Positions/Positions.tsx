@@ -1,4 +1,5 @@
-import type { AddressPosition, AddressPositionDappInfo } from 'defi-sdk';
+import type { AddressPositionDappInfo } from 'defi-sdk';
+import type { AddressPositionWithStandardizedTokenId } from 'src/shared/types/AddressPositionWithStandardizedTokenId';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   formatCurrencyToParts,
@@ -69,6 +70,16 @@ import { openHrefInTabIfSidepanel } from 'src/ui/shared/openInTabIfInSidepanel';
 import { useFirebaseConfig } from 'src/modules/remote-config/plugins/useFirebaseConfig';
 import { isSolanaAddress } from 'src/modules/solana/shared';
 import { getAddressType } from 'src/shared/wallet/classifiers';
+import { useIsChainAbstractionEnabled } from 'src/shared/core/useIsChainAbstractionEnabled';
+import {
+  useGetFungibleTokenPortfolio,
+  useGetPortfolioOverview,
+  useOrby,
+} from '@orb-labs/orby-react';
+import {
+  createChainAddressToStandardizedBalanceMap,
+  processUnifiedPositions,
+} from 'src/shared/converters';
 import {
   TAB_SELECTOR_HEIGHT,
   TAB_TOP_PADDING,
@@ -142,7 +153,7 @@ function AddressPositionItem({
   groupType,
   showGasIcon,
 }: {
-  position: AddressPosition;
+  position: AddressPositionWithStandardizedTokenId;
   groupType: PositionsGroupType;
   hasPreviosNestedPosition?: boolean;
   showGasIcon?: boolean;
@@ -292,7 +303,7 @@ function AddressPositionItem({
 
 interface PreparedPositions {
   gasPositionId: string | null;
-  items: AddressPosition[];
+  items: AddressPositionWithStandardizedTokenId[];
   totalValue: number;
   dappIds: string[];
   dappIndex: Record<
@@ -300,9 +311,9 @@ interface PreparedPositions {
     {
       totalValue: number;
       relativeValue: number;
-      items: AddressPosition[];
+      items: AddressPositionWithStandardizedTokenId[];
       names: string[];
-      nameIndex: Record<string, AddressPosition[]>;
+      nameIndex: Record<string, AddressPositionWithStandardizedTokenId[]>;
     }
   >;
 }
@@ -313,7 +324,7 @@ function usePreparedPositions({
   moveGasPositionToFront,
   dappChain,
 }: {
-  items: AddressPosition[];
+  items: AddressPositionWithStandardizedTokenId[];
   groupType: PositionsGroupType;
   moveGasPositionToFront: boolean;
   dappChain: string | null;
@@ -443,7 +454,7 @@ function PositionList({
   moveGasPositionToFront,
   dappChain,
 }: {
-  items: AddressPosition[];
+  items: AddressPositionWithStandardizedTokenId[];
   address: string | null;
   moveGasPositionToFront: boolean;
   dappChain: string | null;
@@ -546,7 +557,7 @@ function PositionList({
               // TODO: remove this conditional when we have Asset Page 100% enabled in extension
               component: assetPageEnabled ? (
                 <SurfaceItemLink
-                  to={`/asset/${position.asset.id}`}
+                  to={`/asset/${position.asset.id}/${position.standardizedTokenId}`}
                   decorationStyle={{ borderRadius: 16 }}
                 >
                   {itemContent}
@@ -661,6 +672,112 @@ function PositionList({
           </VStack>
         );
       })}
+    </VStack>
+  );
+}
+
+function UnifiedPositions({
+  address,
+  selectedChain,
+  dappChain,
+  onChainChange,
+  renderEmptyView,
+  renderLoadingView,
+  portfolioDecomposition,
+  ...positionListProps
+}: {
+  address: string;
+  renderEmptyView: () => React.ReactNode;
+  renderLoadingView: () => React.ReactNode;
+  dappChain: string | null;
+  selectedChain: string | null;
+  onChainChange: (value: string | null) => void;
+  portfolioDecomposition: WalletPortfolio | null;
+} & Omit<React.ComponentProps<typeof PositionList>, 'items'>) {
+  const { currency } = useCurrency();
+  const { preferences } = usePreferences();
+  const { fungibleTokenOverview } = useGetPortfolioOverview(
+    preferences?.testnetMode?.on ?? false
+  );
+
+  const { fungibleTokens, isLoading: isLoadingFungibleTokens } =
+    useGetFungibleTokenPortfolio(preferences?.testnetMode?.on ?? false);
+
+  const { accountCluster } = useOrby();
+  const { networks } = useNetworks();
+  const addresses = useMemo(() => {
+    return (accountCluster?.accounts ?? []).map((account) => account.address);
+  }, [accountCluster]);
+
+  const { data, isLoading } = useHttpAddressPositions(
+    { addresses, currency },
+    { source: useHttpClientSource() },
+    { refetchInterval: usePositionsRefetchInterval(40000) }
+  );
+
+  // Create a map of {chainId}+{address} to StandardizedBalance
+  const chainAddressToStandardizedBalanceMap = useMemo(() => {
+    return createChainAddressToStandardizedBalanceMap(fungibleTokens);
+  }, [fungibleTokens]);
+
+  const positions = useMemo(() => {
+    return processUnifiedPositions({
+      positions: data?.data,
+      chainAddressToStandardizedBalanceMap,
+      networks: networks || undefined,
+    });
+  }, [chainAddressToStandardizedBalanceMap, data?.data, networks]);
+
+  const chainValue = selectedChain || dappChain || NetworkSelectValue.Unified;
+
+  const items = useMemo(
+    () =>
+      positions?.filter(
+        (position) =>
+          (position.type === 'asset' ? position.is_displayable : true) &&
+          (chainValue === NetworkSelectValue.All ||
+            chainValue === NetworkSelectValue.Unified ||
+            position.chain === chainValue)
+      ),
+    [chainValue, positions]
+  );
+
+  const groupedPositions = groupPositionsByDapp(items);
+
+  if (isLoading || isLoadingFungibleTokens) {
+    return renderLoadingView() as JSX.Element;
+  }
+  if (!items || items.length === 0) {
+    return renderEmptyView() as JSX.Element;
+  }
+
+  return (
+    <VStack gap={Object.keys(groupedPositions).length > 1 ? 16 : 8}>
+      <div style={{ paddingInline: 16 }}>
+        <NetworkBalance
+          standard={getAddressType(address)}
+          dappChain={dappChain}
+          selectedChain={selectedChain}
+          onChange={onChainChange}
+          value={
+            fungibleTokenOverview?.totalValueInFiat ? (
+              <NeutralDecimals
+                parts={formatCurrencyToParts(
+                  fungibleTokenOverview?.totalValueInFiat?.toExact() || 0,
+                  'en',
+                  currency
+                )}
+              />
+            ) : null
+          }
+        />
+      </div>
+      <PositionList
+        items={items}
+        dappChain={dappChain}
+        address={address}
+        {...positionListProps}
+      />
     </VStack>
   );
 }
@@ -869,6 +986,13 @@ export function Positions({
   const { networks, isLoading } = useNetworks(
     positionChains.length ? positionChains : undefined
   );
+
+  const isChainAbstracted = useIsChainAbstractionEnabled();
+
+  const displayUnifiedPositions = useMemo(() => {
+    return isChainAbstracted && chainValue === NetworkSelectValue.Unified;
+  }, [chainValue, isChainAbstracted]);
+
   if (!ready) {
     return (
       <CenteredFillViewportView
@@ -961,7 +1085,20 @@ export function Positions({
   if (!readyToRender) {
     return renderEmptyViewForNetwork();
   }
-  if (isSupportedByBackend) {
+  if (displayUnifiedPositions) {
+    return (
+      <UnifiedPositions
+        address={singleAddressNormalized}
+        dappChain={dappChain}
+        selectedChain={selectedChain}
+        moveGasPositionToFront={moveGasPositionToFront}
+        onChainChange={onChainChange}
+        renderEmptyView={renderEmptyViewForNetwork}
+        renderLoadingView={renderLoadingViewForNetwork}
+        portfolioDecomposition={walletPortfolio || null}
+      />
+    );
+  } else if (isSupportedByBackend) {
     return (
       <MultiChainPositions
         address={singleAddressNormalized}

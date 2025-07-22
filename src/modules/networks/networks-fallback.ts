@@ -756,4 +756,62 @@ export const networksFallbackInfo: NetworkConfig[] = [
     supports_sponsored_transactions: false,
     supports_simulations: true,
   },
+  {
+    id: 'solana',
+    name: 'Solana',
+    icon_url: 'https://chain-icons.s3.amazonaws.com/solana.png',
+    is_testnet: false,
+    standard: 'solana',
+    specification: {
+      solana: {},
+    },
+    native_asset: {
+      id: '11111111111111111111111111111111',
+      address: '11111111111111111111111111111111',
+      name: 'Solana',
+      symbol: 'SOL',
+      decimals: 9,
+    },
+    wrapped_native_asset: null,
+    rpc_url_internal: 'https://rpc.zerion.io/v1/solana',
+    rpc_url_public: ['https://api.mainnet-beta.solana.com'],
+    explorer_name: 'Solana Explorer',
+    explorer_token_url: 'https://explorer.solana.com/address/{ADDRESS}',
+    explorer_address_url: 'https://explorer.solana.com/address/{ADDRESS}',
+    explorer_tx_url: 'https://explorer.solana.com/tx/{HASH}',
+    explorer_home_url: 'https://explorer.solana.com',
+    explorer_urls: ['https://explorer.solana.com'],
+    supports_sending: true,
+    supports_trading: true,
+    supports_bridging: false,
+    supports_actions: true,
+    supports_positions: true,
+    supports_nft_positions: true,
+    supports_sponsored_transactions: false,
+    supports_simulations: true,
+  },
 ];
+
+/**
+ * Finds a network configuration by chain ID from networksFallbackInfo
+ * @param chainId - The chain ID as a string or number
+ * @returns The network configuration or undefined if not found
+ */
+export function findNetworkByChainId(
+  chainId: string | number
+): NetworkConfig | undefined {
+  const chainIdStr = chainId.toString();
+
+  return networksFallbackInfo.find((network) => {
+    // Check for EIP-155 networks
+    if (network.specification?.eip155?.id.toString() === chainIdStr) {
+      return true;
+    }
+    // Check for Solana networks
+    return (
+      network.specification?.solana &&
+      network.id === 'solana' &&
+      chainIdStr === '101'
+    );
+  });
+}
