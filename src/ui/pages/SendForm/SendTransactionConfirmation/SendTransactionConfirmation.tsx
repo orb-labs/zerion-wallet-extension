@@ -5,7 +5,7 @@ import { walletPort } from 'src/ui/shared/channels';
 import { createChain } from 'src/modules/networks/Chain';
 import { invariant } from 'src/shared/invariant';
 import type { MultichainTransaction } from 'src/shared/types/MultichainTransaction';
-import type { OperationSet } from '@orb-labs/orby-core';
+import type { OperationSet, StandardizedBalance } from '@orb-labs/orby-core';
 import type { SendFormState } from '../shared/SendFormState';
 import { toConfiguration } from '../shared/helpers';
 import type { GasTokenInput } from '../../SendTransaction/NetworkFee/NetworkFee';
@@ -20,6 +20,7 @@ export function SendTransactionConfirmation({
   operationSet,
   selectedGasToken,
   setSelectedGasToken,
+  fungibleTokens,
 }: {
   formId: string;
   transaction: MultichainTransaction;
@@ -30,6 +31,7 @@ export function SendTransactionConfirmation({
   operationSet?: OperationSet;
   selectedGasToken?: GasTokenInput;
   setSelectedGasToken?: (gasToken?: GasTokenInput) => void;
+  fungibleTokens?: StandardizedBalance[] | undefined;
 }) {
   const { data: wallet } = useQuery({
     queryKey: ['wallet/uiGetCurrentWallet'],
@@ -67,6 +69,7 @@ export function SendTransactionConfirmation({
       operationSet={operationSet}
       selectedGasToken={selectedGasToken}
       setSelectedGasToken={setSelectedGasToken}
+      fungibleTokens={fungibleTokens}
     />
   );
 }

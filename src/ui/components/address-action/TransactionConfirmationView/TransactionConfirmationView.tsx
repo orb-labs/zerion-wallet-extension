@@ -19,7 +19,7 @@ import { SecurityStatusBackground } from 'src/ui/shared/security-check';
 import { VStack } from 'src/ui/ui-kit/VStack';
 import { AddressActionNetworkFee } from 'src/ui/pages/SendTransaction/TransactionConfiguration/TransactionConfiguration';
 import type { GasTokenInput } from 'src/ui/pages/SendTransaction/NetworkFee/NetworkFee';
-import type { OperationSet } from '@orb-labs/orby-core';
+import type { OperationSet, StandardizedBalance } from '@orb-labs/orby-core';
 import { WalletAvatar } from '../../WalletAvatar';
 import { WalletDisplayName } from '../../WalletDisplayName';
 import { TransactionSimulation } from '../TransactionSimulation';
@@ -40,6 +40,7 @@ export function TransactionConfirmationView({
   selectedGasToken,
   setSelectedGasToken,
   operationSet,
+  fungibleTokens,
 }: {
   formId: string;
   title: React.ReactNode;
@@ -57,6 +58,7 @@ export function TransactionConfirmationView({
   selectedGasToken?: GasTokenInput;
   setSelectedGasToken?: (gasToken?: GasTokenInput) => void;
   operationSet?: OperationSet;
+  fungibleTokens?: StandardizedBalance[] | undefined;
 }) {
   const { preferences, query } = usePreferences();
 
@@ -179,6 +181,9 @@ export function TransactionConfirmationView({
                   chain={chain.toString()}
                   networkFee={txInterpretQuery.data?.action?.transaction.fee}
                   isLoading={txInterpretQuery.isLoading}
+                  selectedGasToken={selectedGasToken}
+                  selectGasToken={setSelectedGasToken}
+                  fungibleTokens={fungibleTokens}
                 />
               ) : null}
             </div>

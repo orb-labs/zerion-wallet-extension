@@ -3,11 +3,12 @@ import type { IncomingTransactionWithChainId } from 'src/modules/ethereum/types/
 import { useGetOperationsToSignTransactionOrSignTypedData } from '@orb-labs/orby-react';
 import type { ExternallyOwnedAccount } from 'src/shared/types/ExternallyOwnedAccount';
 import type { GasTokenInput } from 'src/ui/pages/SendTransaction/NetworkFee/NetworkFee';
+import type { TransactionEVM } from 'src/shared/types/Quote';
 import { useOperationSetError } from './useOperationSetError';
 
 export function useOrbyGetOperationsToSignTransactionOrSignTypedData(
   transaction: {
-    evm?: IncomingTransactionWithChainId | undefined;
+    evm?: IncomingTransactionWithChainId | TransactionEVM | undefined;
     solana?: string | undefined;
     typedData?: string | undefined;
   },

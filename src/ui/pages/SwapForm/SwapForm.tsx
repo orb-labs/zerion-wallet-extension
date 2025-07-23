@@ -96,11 +96,7 @@ import { ensureSolanaResult } from 'src/modules/shared/transactions/helpers';
 import { isMatchForEcosystem } from 'src/shared/wallet/shared';
 import { Networks } from 'src/modules/networks/Networks';
 import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
-import {
-  useGetFungibleTokenPortfolio,
-  useGetOperationsToSignTransactionOrSignTypedData,
-  useOrby,
-} from '@orb-labs/orby-react';
+import { useGetFungibleTokenPortfolio, useOrby } from '@orb-labs/orby-react';
 import type { OperationStatus } from '@orb-labs/orby-core';
 import { OperationStatusType } from '@orb-labs/orby-core';
 import {
@@ -109,7 +105,7 @@ import {
   signUserOperation,
 } from 'src/shared/core/orb';
 import _ from 'lodash';
-import { useOperationSetError } from 'src/ui/shared/hooks/useOperationSetError';
+import { useOrbyGetOperationsToSignTransactionOrSignTypedData } from 'src/ui/shared/hooks/useOrbyGetOperationsToSignTransactionOrSignTypedData';
 import { NetworkSelect } from '../Networks/NetworkSelect';
 import { TransactionConfiguration } from '../SendTransaction/TransactionConfiguration';
 import { txErrorToMessage } from '../SendTransaction/shared/transactionErrorToMessage';
@@ -527,53 +523,23 @@ function SwapFormComponent() {
     isDefault: true,
   });
 
-  const gasToken = useMemo(() => {
-    return selectedGasToken?.standardizedTokenId
-      ? { standardizedTokenId: selectedGasToken.standardizedTokenId }
-      : undefined;
-  }, [selectedGasToken]);
-
-  const orbyParams = useMemo(() => {
-    if (!isOrbyEnabled) {
-      return { data: '0x' };
-    } else if (selectedQuote?.transactionSwap?.evm) {
-      return {
-        data: selectedQuote?.transactionSwap?.evm?.data as string,
-        to: selectedQuote?.transactionSwap?.evm?.to as string,
-        value: selectedQuote?.transactionSwap?.evm?.value
-          ? BigInt(selectedQuote?.transactionSwap?.evm?.value?.toString())
-          : undefined,
-        entrypointAccountAddress: wallet?.address as string,
-        chainId,
-        gasToken,
-      };
-    } else if (selectedQuote?.transactionSwap?.solana) {
-      return {
-        data: selectedQuote?.transactionSwap?.solana as string,
-        entrypointAccountAddress: wallet?.address as string,
-        chainId: BigInt(101),
-        gasToken,
-      };
-    } else {
-      return { data: '0x' };
-    }
-  }, [selectedQuote, isOrbyEnabled, chainId, wallet, gasToken]);
-
   const {
     operationSet,
+    operationSetError,
+    operationSetLoading,
     virtualNode,
     aggregateFee,
-    isLoading: OperationSetLoading,
-  } = useGetOperationsToSignTransactionOrSignTypedData(
-    orbyParams?.data,
-    orbyParams?.to,
-    orbyParams?.value,
-    orbyParams?.entrypointAccountAddress,
-    orbyParams?.chainId,
-    orbyParams.gasToken
+  } = useOrbyGetOperationsToSignTransactionOrSignTypedData(
+    {
+      evm: selectedQuote?.transactionSwap?.evm ?? undefined,
+      solana: selectedQuote?.transactionSwap?.solana ?? undefined,
+      typedData: undefined,
+    },
+    wallet ? wallet : undefined,
+    isOrbyEnabled,
+    selectedGasToken,
+    chainId
   );
-
-  const operationSetError = useOperationSetError(operationSet, isOrbyEnabled);
 
   const selectGasToken = useCallback(
     (gasToken?: GasTokenInput) => {
@@ -1272,7 +1238,7 @@ function SwapFormComponent() {
                           (selectedQuote && !selectedQuote.transactionSwap) ||
                             quotesData.error
                         ) ||
-                        OperationSetLoading ||
+                        operationSetLoading ||
                         submitOperationSetIsLoading
                       }
                       holdToSign={false}
@@ -1286,7 +1252,7 @@ function SwapFormComponent() {
                         }}
                       >
                         {hint ||
-                          (quotesData.isLoading || OperationSetLoading
+                          (quotesData.isLoading || operationSetLoading
                             ? 'Fetching offers'
                             : sendTransactionMutation.isLoading ||
                               submitOperationSetIsLoading

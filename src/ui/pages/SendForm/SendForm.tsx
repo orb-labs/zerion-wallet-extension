@@ -58,10 +58,7 @@ import { Networks } from 'src/modules/networks/Networks';
 import { useSearchParamsObj } from 'src/ui/shared/forms/useSearchParamsObj';
 import { getDefaultChain } from 'src/ui/shared/forms/trading/getDefaultChain';
 import { isMatchForEcosystem } from 'src/shared/wallet/shared';
-import {
-  useGetOperationsToSignTransactionOrSignTypedData,
-  useOrby,
-} from '@orb-labs/orby-react';
+import { useGetFungibleTokenPortfolio, useOrby } from '@orb-labs/orby-react';
 import type { OperationStatus } from '@orb-labs/orby-core';
 import { OperationStatusType } from '@orb-labs/orby-core';
 import {
@@ -70,8 +67,8 @@ import {
   signUserOperation,
 } from 'src/shared/core/orb';
 import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
-import { useOperationSetError } from 'src/ui/shared/hooks/useOperationSetError';
 import _ from 'lodash';
+import { useOrbyGetOperationsToSignTransactionOrSignTypedData } from 'src/ui/shared/hooks/useOrbyGetOperationsToSignTransactionOrSignTypedData';
 import { TransactionConfiguration } from '../SendTransaction/TransactionConfiguration';
 import { NetworkSelect } from '../Networks/NetworkSelect';
 import { txErrorToMessage } from '../SendTransaction/shared/transactionErrorToMessage';
@@ -213,6 +210,7 @@ function SendFormComponent() {
   }, [chain, networks]);
 
   const isOrbyEnabled = useIsOrbyEnabled(chainId);
+  const { fungibleTokens } = useGetFungibleTokenPortfolio(undefined, chainId);
 
   const [selectedGasToken, setSelectedGasToken] = useState<GasTokenInput>({
     name: 'Native Token',
@@ -326,52 +324,23 @@ function SendFormComponent() {
     [addressType]
   );
 
-  const gasToken = useMemo(() => {
-    return selectedGasToken?.standardizedTokenId
-      ? { standardizedTokenId: selectedGasToken.standardizedTokenId }
-      : undefined;
-  }, [selectedGasToken]);
-
-  const orbyParams = useMemo(() => {
-    if (!isOrbyEnabled) {
-      return { data: '0x' };
-    } else if (sendData?.transaction?.evm) {
-      return {
-        data: sendData?.transaction?.evm?.data as string,
-        to: sendData?.transaction?.evm?.to as string,
-        value: sendData?.transaction?.evm?.value
-          ? BigInt(sendData?.transaction?.evm?.value?.toString())
-          : undefined,
-        entrypointAccountAddress: wallet?.address as string,
-        chainId,
-        gasToken,
-      };
-    } else if (sendData?.transaction?.solana) {
-      return {
-        data: sendData?.transaction?.solana as string,
-        entrypointAccountAddress: wallet?.address as string,
-        chainId: BigInt(101),
-        gasToken,
-      };
-    } else {
-      return { data: '0x' };
-    }
-  }, [sendData, isOrbyEnabled, chainId, wallet, gasToken]);
-
   const {
     operationSet,
+    operationSetError,
+    operationSetLoading,
     virtualNode,
-    isLoading: OperationSetLoading,
-  } = useGetOperationsToSignTransactionOrSignTypedData(
-    orbyParams?.data,
-    orbyParams?.to,
-    orbyParams?.value,
-    orbyParams?.entrypointAccountAddress,
-    orbyParams?.chainId,
-    orbyParams.gasToken
+    aggregateFee,
+  } = useOrbyGetOperationsToSignTransactionOrSignTypedData(
+    {
+      evm: sendData?.transaction?.evm,
+      solana: sendData?.transaction?.solana,
+      typedData: undefined,
+    },
+    wallet ? wallet : undefined,
+    isOrbyEnabled,
+    selectedGasToken,
+    chainId
   );
-
-  const operationSetError = useOperationSetError(operationSet, isOrbyEnabled);
 
   const selectGasToken = useCallback(
     (gasToken?: GasTokenInput) => {
@@ -669,6 +638,11 @@ function SendFormComponent() {
                 isLoading={
                   sendDataQuery.isFetching || sendDataQuery.isPreviousData
                 }
+                selectedGasToken={selectedGasToken}
+                selectGasToken={selectGasToken}
+                aggregateFee={aggregateFee}
+                operationSet={operationSet}
+                fungibleTokens={fungibleTokens}
               />
             ) : sendDataQuery.isLoading ? (
               <div style={{ display: 'flex', justifyContent: 'end' }}>
@@ -699,6 +673,7 @@ function SendFormComponent() {
                     operationSet={operationSet}
                     selectedGasToken={selectedGasToken}
                     setSelectedGasToken={selectGasToken}
+                    fungibleTokens={fungibleTokens}
                   />
                 </ViewLoadingSuspense>
               </>
@@ -729,7 +704,7 @@ function SendFormComponent() {
               disabled={
                 sendTxMutation.isLoading ||
                 submitOperationSetIsLoading ||
-                OperationSetLoading
+                operationSetLoading
               }
               holdToSign={false}
             />
