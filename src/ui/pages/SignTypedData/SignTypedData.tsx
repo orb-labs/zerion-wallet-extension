@@ -659,6 +659,7 @@ function SignTypedDataContent({
     selectedGasToken,
     chainId ? BigInt(chainId) : undefined
   );
+
   const { fungibleTokens } = useGetFungibleTokenPortfolio(
     undefined,
     chainId && isOrbyEnabled ? BigInt(chainId) : undefined

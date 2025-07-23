@@ -578,6 +578,7 @@ function SendTransactionContent({
   const [allowanceQuantityBase, setAllowanceQuantityBase] = useState('');
   const [submitTransactionIsLoading, setSubmitTransactionIsLoading] =
     useState(false);
+
   const configureTransactionToBeSigned = useEvent(
     async (
       transaction: IncomingTransaction,
