@@ -19,7 +19,7 @@
     "format": "prettier --loglevel warn --write \"**/*.{ts,tsx,css,md}\"",
     "prepare": "husky install",
     "postversion": "node ./scripts/manifest-version.js",
-    "copy-webpage": "cp ./node_modules/@orb-labs/orby-core-mini/dist/esm/webpage.min.js ./src/content-script/webpage.js && cp ./node_modules/@orb-labs/orby-core-mini/dist/esm/core_webpage.min.js ./src/content-script/core-webpage.js && cp ./node_modules/@orb-labs/orby-core-mini/dist/esm/core_webpage_injector.min.js ./src/content-script/core-webpage-injector.js"
+    "copy-webpage": "cp ./node_modules/@orb-labs/orby-core-mini/dist/esm/webpage.min.js ./src/webpage.js && cp ./node_modules/@orb-labs/orby-core-mini/dist/esm/core_webpage.min.js ./src/core-webpage.js && cp ./node_modules/@orb-labs/orby-core-mini/dist/esm/webpage.min.js ./src/content-script/webpage.js && cp ./node_modules/@orb-labs/orby-core-mini/dist/esm/core_webpage.min.js ./src/content-script/core-webpage.js && cp ./node_modules/@orb-labs/orby-core-mini/dist/esm/core_webpage_injector.min.js ./src/content-script/core-webpage-injector.js"
   },
   "alias": {
     "src": "./src",

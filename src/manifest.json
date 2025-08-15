@@ -57,8 +57,10 @@
     {
       "resources": [
         "content-script/in-page.ts",
+        "content-script/core-webpage.js",
         "content-script/webpage.js",
-        "content-script/core-webpage.js"
+        "webpage.js",
+        "core-webpage.js"
       ],
       "matches": ["<all_urls>"]
     }
