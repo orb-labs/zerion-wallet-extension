@@ -34,7 +34,7 @@ import { baseToCommon } from 'src/shared/units/convert';
 import { getDecimals } from 'src/modules/networks/asset';
 import { getFungibleAsset } from 'src/modules/ethereum/transactions/actionAsset';
 import { useGetFungibleTokenPortfolio } from '@orb-labs/orby-react';
-import type { StandardizedBalance } from '@orb-labs/orby-core';
+import type { OperationSet, StandardizedBalance } from '@orb-labs/orby-core';
 import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
 import { useNetworks } from 'src/modules/networks/useNetworks';
 import { NetworkFee } from '../NetworkFee';
@@ -88,25 +88,44 @@ export function NetworkFeeLineInfo({
   label,
   networkFee,
   isLoading,
+  selectedGasToken,
+  selectGasToken,
+  fungibleTokens,
+  aggregateFee,
+  operationSet,
 }: {
   label?: React.ReactNode;
   networkFee: NetworkFeeType;
   isLoading: boolean;
+  selectedGasToken?: GasTokenInput;
+  selectGasToken?: (gasToken?: GasTokenInput) => void;
+  fungibleTokens?: StandardizedBalance[] | undefined;
+  aggregateFee?: string;
+  operationSet?: OperationSet;
 }) {
   const { currency } = useCurrency();
+
   return (
     <HStack gap={8} justifyContent="space-between">
       {label !== undefined ? (
         label
       ) : (
-        <UIText kind="small/regular">Network Fee</UIText>
+        <UIText kind="small/regular">Network Felix</UIText>
       )}
-
+      {selectedGasToken && operationSet ? (
+        <GasTokenSelector
+          selectedGasToken={selectedGasToken}
+          setSelectedGasToken={selectGasToken}
+          fungibleTokens={fungibleTokens}
+        />
+      ) : null}
       <UIText kind="small/accent">
         <HStack gap={8} alignItems="center">
           {isLoading ? <CircleSpinner /> : null}
 
-          {networkFee.amount.value != null
+          {aggregateFee
+            ? aggregateFee
+            : networkFee.amount.value != null
             ? formatCurrencyValueExtra(
                 networkFee.amount.value,
                 'en',
