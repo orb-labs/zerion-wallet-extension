@@ -99,6 +99,8 @@ import ScrollIcon from 'jsx:src/ui/assets/scroll.svg';
 import ArrowDownIcon from 'jsx:src/ui/assets/caret-down-filled.svg';
 import { SiteFaviconImg } from 'src/ui/components/SiteFaviconImg';
 import { NetworkId } from 'src/modules/networks/NetworkId';
+import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
+import { useOrbyGetOperationsToSignTransactionOrSignTypedData } from 'src/ui/shared/hooks/useOrbyGetOperationsToSignTransactionOrSignTypedData';
 import type { PopoverToastHandle } from '../Settings/PopoverToast';
 import { PopoverToast } from '../Settings/PopoverToast';
 import { TransactionConfiguration } from './TransactionConfiguration';
@@ -110,6 +112,7 @@ import { TransactionAdvancedView } from './TransactionAdvancedView';
 import { TransactionWarnings } from './TransactionWarnings';
 import { txErrorToMessage } from './shared/transactionErrorToMessage';
 import { AddressActionNetworkFee } from './TransactionConfiguration/TransactionConfiguration';
+import type { GasTokenInput } from './NetworkFee/NetworkFee';
 
 async function configureTransactionToSign<T extends IncomingTransaction>(
   transaction: T,
@@ -226,7 +229,7 @@ function usePreparedTx(transaction: IncomingTransaction, origin: string) {
     queryFn: async () =>
       withChainId ? resolveGasAndFee(withChainId, { source }) : null,
     enabled: Boolean(withChainId),
-    useErrorBoundary: true,
+    // useErrorBoundary: true,
     suspense: false,
   });
   return {
@@ -303,6 +306,8 @@ function TransactionDefaultView({
   paymasterWaiting,
   onOpenAdvancedView,
   onFeeValueCommonReady,
+  selectedGasToken,
+  setSelectedGasToken,
 }: {
   networks: Networks;
   chain: Chain;
@@ -324,6 +329,8 @@ function TransactionDefaultView({
   paymasterWaiting: boolean;
   onOpenAdvancedView: () => void;
   onFeeValueCommonReady: (value: string) => void;
+  selectedGasToken?: GasTokenInput;
+  setSelectedGasToken?: (gasToken?: GasTokenInput) => void;
 }) {
   const { singleAddress } = useAddressParams();
   const [params] = useSearchParams();
@@ -497,6 +504,8 @@ function TransactionDefaultView({
                         : null
                     }
                     listViewTransitions={true}
+                    selectedGasToken={selectedGasToken}
+                    setSelectedGasToken={setSelectedGasToken}
                   />
                 </React.Suspense>
               ) : null}
@@ -575,6 +584,30 @@ function SendTransactionContent({
 
   const network = networks.getByNetworkId(chain) || null;
   const source = preferences?.testnetMode?.on ? 'testnet' : 'mainnet';
+
+  const isOrbyEnabled = useIsOrbyEnabled(BigInt(populatedTransaction?.chainId));
+  const [selectedGasToken, setSelectedGasToken] = useState<GasTokenInput>({
+    name: 'Native Token',
+    standardizedTokenId: undefined,
+    isDefault: true,
+  });
+
+  const selectGasToken = useCallback(
+    (gasToken?: GasTokenInput) => {
+      if (gasToken) {
+        setSelectedGasToken(gasToken);
+      }
+    },
+    [setSelectedGasToken]
+  );
+
+  const { operationSet, operationSetError, operationSetLoading } =
+    useOrbyGetOperationsToSignTransactionOrSignTypedData(
+      populatedTransaction,
+      wallet,
+      isOrbyEnabled,
+      selectedGasToken
+    );
 
   const paymasterPossible =
     USE_PAYMASTER_FEATURE && Boolean(network?.supports_sponsored_transactions);
@@ -790,6 +823,8 @@ function SendTransactionContent({
             paymasterWaiting={paymasterWaiting}
             onOpenAdvancedView={openAdvancedView}
             onFeeValueCommonReady={handleFeeValueCommonReady}
+            selectedGasToken={selectedGasToken}
+            setSelectedGasToken={selectGasToken}
           />
         ) : null}
         <CenteredDialog
@@ -808,6 +843,7 @@ function SendTransactionContent({
                 transaction={{ evm: populatedTransaction }}
                 addressAction={addressAction}
                 onCopyData={() => toastRef.current?.showToast()}
+                operationSet={operationSet}
               />
             </>
           )}
@@ -830,6 +866,11 @@ function SendTransactionContent({
           {sendTransactionMutation.isError ? (
             <UIText kind="body/regular" color="var(--negative-500)">
               {txErrorToMessage(sendTransactionMutation.error)}
+            </UIText>
+          ) : null}
+          {operationSetError ? (
+            <UIText kind="body/regular" color="var(--negative-500)">
+              {operationSetError}
             </UIText>
           ) : null}
           {view === View.customAllowance ? (
@@ -859,8 +900,14 @@ function SendTransactionContent({
                   wallet={wallet}
                   ref={sendTxBtnRef}
                   onClick={() => sendTransaction()}
-                  isLoading={sendTransactionMutation.isLoading}
-                  disabled={sendTransactionMutation.isLoading}
+                  isLoading={
+                    sendTransactionMutation.isLoading || operationSetLoading
+                  }
+                  disabled={
+                    sendTransactionMutation.isLoading ||
+                    operationSetLoading ||
+                    !!operationSetError
+                  }
                   buttonKind={
                     interpretationHasCriticalWarning ? 'danger' : 'primary'
                   }
@@ -1077,6 +1124,7 @@ function SolDefaultView({
               transaction={{ solana: rawTransaction }}
               addressAction={addressAction}
               onCopyData={() => toastRef.current?.showToast()}
+              operationSet={undefined}
             />
           </>
         )}

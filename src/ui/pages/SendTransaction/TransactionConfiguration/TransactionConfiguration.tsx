@@ -33,8 +33,12 @@ import { isEthereumAddress } from 'src/shared/isEthereumAddress';
 import { baseToCommon } from 'src/shared/units/convert';
 import { getDecimals } from 'src/modules/networks/asset';
 import { getFungibleAsset } from 'src/modules/ethereum/transactions/actionAsset';
+import { useGetFungibleTokenPortfolio } from '@orb-labs/orby-react';
+import type { StandardizedBalance } from '@orb-labs/orby-core';
+import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
 import { NetworkFee } from '../NetworkFee';
 import { NonceLine } from '../NonceLine';
+import type { GasTokenInput } from '../NetworkFee/NetworkFee';
 import { useTransactionFee } from './useTransactionFee';
 
 export function GasbackHint() {
@@ -181,6 +185,9 @@ function NetworkFeeLine({
   paymasterPossible,
   paymasterEligible,
   keepPreviousData = false,
+  selectedGasToken,
+  setSelectedGasToken,
+  fungibleTokens,
 }: {
   transaction: IncomingTransactionWithFrom;
   chain: Chain;
@@ -190,6 +197,9 @@ function NetworkFeeLine({
   paymasterPossible: boolean;
   paymasterEligible: boolean;
   keepPreviousData?: boolean;
+  selectedGasToken?: GasTokenInput;
+  setSelectedGasToken?: (gasToken?: GasTokenInput) => void;
+  fungibleTokens: StandardizedBalance[];
 }) {
   const { data: chainGasPrices = null } = useGasPrices(chain, {
     suspense: true,
@@ -234,6 +244,9 @@ function NetworkFeeLine({
         chainGasPrices={chainGasPrices}
         networkFeeConfiguration={configuration.networkFee}
         label={<UIText kind="small/regular">Network Fee</UIText>}
+        selectedGasToken={selectedGasToken}
+        setSelectedGasToken={setSelectedGasToken}
+        fungibleTokens={fungibleTokens}
         displayValueEnd={
           paymasterPossible && !paymasterEligible ? (
             <>
@@ -278,6 +291,8 @@ export function TransactionConfiguration({
   keepPreviousData = false,
   gasback: gasbackData,
   listViewTransitions = false,
+  selectedGasToken,
+  setSelectedGasToken,
 }: {
   transaction: IncomingTransaction;
   from: string;
@@ -292,6 +307,8 @@ export function TransactionConfiguration({
   gasback: GasbackData | null;
   /** Hacky, experimental and only needed on SendTransaction View because list is stuck to the bottom */
   listViewTransitions?: boolean;
+  selectedGasToken?: GasTokenInput;
+  setSelectedGasToken?: (gasToken?: GasTokenInput) => void;
 }) {
   const { preferences } = usePreferences();
   const transactionWithFrom = useMemo(
@@ -302,6 +319,11 @@ export function TransactionConfiguration({
   const [gasback, setGasback] = useState(gasbackValueOriginal);
   const hasGasbackOnFirstRenderRef = useRef(gasback);
 
+  const isOrbyEnabled = useIsOrbyEnabled(
+    incomingTransaction.chainId
+      ? BigInt(incomingTransaction.chainId)
+      : undefined
+  );
   const { data: loyaltyEnabled } = useRemoteConfigValue(
     'extension_loyalty_enabled'
   );
@@ -328,6 +350,13 @@ export function TransactionConfiguration({
 
   // viewTransitionNames need to be unique when this component is used more than once on the same view
   const id = usePlainId();
+
+  const { fungibleTokens } = useGetFungibleTokenPortfolio(
+    undefined,
+    transactionWithFrom.chainId && isOrbyEnabled
+      ? BigInt(transactionWithFrom.chainId)
+      : undefined
+  );
 
   return (
     <VStack gap={8}>
@@ -370,6 +399,9 @@ export function TransactionConfiguration({
             onFeeValueCommonReady={onFeeValueCommonReady}
             paymasterPossible={paymasterPossible}
             paymasterEligible={paymasterEligible}
+            selectedGasToken={selectedGasToken}
+            setSelectedGasToken={setSelectedGasToken}
+            fungibleTokens={fungibleTokens}
           />
         </div>
       )}
