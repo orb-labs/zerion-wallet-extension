@@ -5,6 +5,7 @@ import { isTruthy } from 'is-truthy-ts';
 import { useMemo } from 'react';
 import { useCurrency } from 'src/modules/currency/useCurrency';
 import type { Chain } from 'src/modules/networks/Chain';
+import { useIsChainAbstractionEnabled } from 'src/shared/core/useIsChainAbstractionEnabled';
 
 export function usePosition({
   assetId,
@@ -16,6 +17,7 @@ export function usePosition({
   chain: Chain | null;
 }) {
   const { currency } = useCurrency();
+  const isChainAbstractionEnabled = useIsChainAbstractionEnabled();
   const assetsPrices = useAssetsPrices(
     { asset_codes: [assetId].filter(isTruthy), currency },
     { client, enabled: Boolean(assetId) }
@@ -28,10 +30,10 @@ export function usePosition({
       positions?.find(
         (p) =>
           p.asset.id === assetId &&
-          p.chain === chain?.toString() &&
+          (p.chain === chain?.toString() || isChainAbstractionEnabled) &&
           p.type === 'asset'
       ) ?? null,
-    [assetId, positions, chain]
+    [assetId, positions, chain, isChainAbstractionEnabled]
   );
 
   return useMemo(() => {
