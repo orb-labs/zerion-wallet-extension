@@ -6,10 +6,14 @@ import type { GasTokenInput } from 'src/ui/pages/SendTransaction/NetworkFee/Netw
 import { useOperationSetError } from './useOperationSetError';
 
 export function useOrbyGetOperationsToSignTransactionOrSignTypedData(
-  populatedTransaction: IncomingTransactionWithChainId | undefined,
+  transaction: {
+    evm: IncomingTransactionWithChainId | undefined;
+    typedData: string | undefined;
+  },
   wallet: ExternallyOwnedAccount,
   isOrbyEnabled: boolean | undefined,
-  selectedGasToken: GasTokenInput | undefined
+  selectedGasToken: GasTokenInput | undefined,
+  chainId: bigint | undefined
 ) {
   const gasToken = useMemo(() => {
     return selectedGasToken?.standardizedTokenId
@@ -17,21 +21,55 @@ export function useOrbyGetOperationsToSignTransactionOrSignTypedData(
       : undefined;
   }, [selectedGasToken]);
 
-  const { operationSet, isLoading: operationSetLoading } =
-    useGetOperationsToSignTransactionOrSignTypedData(
-      populatedTransaction?.data as string,
-      populatedTransaction?.to as string,
-      populatedTransaction?.value
-        ? BigInt(populatedTransaction?.value.toString())
-        : undefined,
-      isOrbyEnabled ? (wallet?.address as string) : undefined,
-      isOrbyEnabled && populatedTransaction?.chainId
-        ? BigInt(populatedTransaction?.chainId as number)
-        : undefined,
-      gasToken
-    );
+  const orbyParams = useMemo(() => {
+    if (!isOrbyEnabled) {
+      return { data: undefined as unknown as string };
+    } else if (transaction.evm) {
+      return {
+        data: transaction.evm?.data as string,
+        to: transaction.evm?.to as string,
+        value: transaction.evm?.value
+          ? BigInt(transaction.evm?.value?.toString())
+          : undefined,
+        entrypointAccountAddress: wallet?.address as string,
+        chainId,
+        gasToken,
+      };
+    } else if (transaction.typedData) {
+      return {
+        data: transaction.typedData as string,
+        entrypointAccountAddress: wallet?.address as string,
+        chainId,
+        gasToken,
+      };
+    } else {
+      return { data: undefined as unknown as string };
+    }
+  }, [transaction, isOrbyEnabled, chainId, wallet, gasToken]);
+
+  const {
+    operationSet,
+    isLoading: operationSetLoading,
+    operations,
+    virtualNode,
+    aggregateFee,
+  } = useGetOperationsToSignTransactionOrSignTypedData(
+    orbyParams?.data,
+    orbyParams?.to,
+    orbyParams?.value,
+    orbyParams?.entrypointAccountAddress,
+    orbyParams?.chainId,
+    orbyParams.gasToken
+  );
 
   const operationSetError = useOperationSetError(operationSet, isOrbyEnabled);
 
-  return { operationSet, operationSetError, operationSetLoading };
+  return {
+    operationSet,
+    operationSetError,
+    operationSetLoading,
+    operations,
+    virtualNode,
+    aggregateFee,
+  };
 }
