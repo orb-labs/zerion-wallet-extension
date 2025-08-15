@@ -30,6 +30,7 @@ import { prepareForHref } from 'src/ui/shared/prepareForHref';
 import { UnstyledAnchor } from 'src/ui/ui-kit/UnstyledAnchor';
 import { useTransformTrigger } from 'src/ui/components/useTransformTrigger';
 import { Background } from 'src/ui/components/Background/Background';
+import { removeConnectedAppSession } from '@orb-labs/orby-core-mini';
 import { useRemovePermissionMutation } from '../shared/useRemovePermission';
 import { getConnectedSite } from '../shared/getConnectedSite';
 import { MetamaskMode } from './MetamaskMode';
@@ -55,6 +56,7 @@ function RevokeAllButton({
         onClick={() => {
           if (removeActionDialogRef.current) {
             showConfirmDialog(removeActionDialogRef.current).then(() => {
+              removeConnectedAppSession(origin);
               removePermissionMutation.mutate({ origin });
             });
           }
@@ -236,6 +238,9 @@ export function ConnectedSite() {
                                 showConfirmDialog(
                                   removeActionDialogRef.current
                                 ).then(() => {
+                                  removeConnectedAppSession(
+                                    connectedSite.origin
+                                  );
                                   removePermissionMutation.mutate({
                                     origin: connectedSite.origin,
                                     address: wallet.address,
