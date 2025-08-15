@@ -5,5 +5,6 @@ export function useIsOneClickTransactionsAndGasAbstractionEnabled() {
     'one_click_transactions_and_gas_abstraction'
   );
 
-  return oneClickTransactionsAndGasAbstraction;
+  // TODO: remove this once we have a proper remote config
+  return oneClickTransactionsAndGasAbstraction || true;
 }
