@@ -99,8 +99,18 @@ import ScrollIcon from 'jsx:src/ui/assets/scroll.svg';
 import ArrowDownIcon from 'jsx:src/ui/assets/caret-down-filled.svg';
 import { SiteFaviconImg } from 'src/ui/components/SiteFaviconImg';
 import { NetworkId } from 'src/modules/networks/NetworkId';
+import type { OperationStatus } from '@orb-labs/orby-core';
+import { OperationStatusType } from '@orb-labs/orby-core';
+import {
+  signUserOperation,
+  signTransaction,
+  signTypedData,
+} from 'src/shared/core/orb';
+import _ from 'lodash';
+import type { Hex } from '@noble/ed25519';
 import { useIsOrbyEnabled } from 'src/shared/core/useIsOrbyEnabled';
 import { useOrbyGetOperationsToSignTransactionOrSignTypedData } from 'src/ui/shared/hooks/useOrbyGetOperationsToSignTransactionOrSignTypedData';
+import { useOrby } from '@orb-labs/orby-react';
 import type { PopoverToastHandle } from '../Settings/PopoverToast';
 import { PopoverToast } from '../Settings/PopoverToast';
 import { TransactionConfiguration } from './TransactionConfiguration';
@@ -562,6 +572,8 @@ function SendTransactionContent({
     });
 
   const [allowanceQuantityBase, setAllowanceQuantityBase] = useState('');
+  const [submitTransactionIsLoading, setSubmitTransactionIsLoading] =
+    useState(false);
 
   const configureTransactionToBeSigned = useEvent(
     async (
@@ -604,7 +616,7 @@ function SendTransactionContent({
     [setSelectedGasToken]
   );
 
-  const { operationSet, operationSetError, operationSetLoading } =
+  const { operationSet, operationSetError, operationSetLoading, virtualNode } =
     useOrbyGetOperationsToSignTransactionOrSignTypedData(
       { evm: populatedTransaction, typedData: undefined },
       wallet,
@@ -770,6 +782,73 @@ function SendTransactionContent({
     onSuccess: (tx) => handleSentTransaction(tx),
   });
 
+  const operationStatusesUpdated = useCallback(
+    async (
+      statusSummary: OperationStatusType,
+      finalTransactionStatus?: OperationStatus,
+      _statuses?: OperationStatus[]
+    ) => {
+      if (
+        [OperationStatusType.SUCCESSFUL, OperationStatusType.PENDING].includes(
+          statusSummary
+        )
+      ) {
+        if (virtualNode && finalTransactionStatus?.hash) {
+          const receipt = await (virtualNode as any).waitForTransactionReceipt({
+            hash: finalTransactionStatus.hash as Hex,
+          });
+
+          handleSentTransaction({
+            evm: {
+              ...receipt,
+              hash: receipt.transactionHash,
+              to: receipt.to,
+              from: receipt.from,
+              value: receipt.value,
+              data: receipt.data,
+            },
+          });
+
+          setSubmitTransactionIsLoading(false);
+        }
+      }
+    },
+    [handleSentTransaction, virtualNode]
+  );
+
+  const { accountCluster } = useOrby();
+  const submitTransaction = useCallback(async () => {
+    if (isOrbyEnabled) {
+      if (accountCluster && virtualNode && virtualNode) {
+        setSubmitTransactionIsLoading(true);
+        const { operationResponses } = await virtualNode.sendOperationSet(
+          accountCluster,
+          operationSet,
+          signTransaction,
+          signUserOperation,
+          signTypedData
+        );
+
+        const ids = operationResponses
+          ?.map((op) => op.id)
+          .filter((id) => !_.isUndefined(id));
+        virtualNode?.subscribeToOperationStatuses(
+          ids,
+          operationStatusesUpdated
+        );
+      }
+    } else {
+      sendTransaction();
+    }
+  }, [
+    accountCluster,
+    operationSet,
+    virtualNode,
+    operationStatusesUpdated,
+    isOrbyEnabled,
+    sendTransaction,
+  ]);
+
   if (localAddressActionQuery.isSuccess && !localAddressAction) {
     throw new Error('Unexpected missing localAddressAction');
   }
@@ -903,14 +982,15 @@ function SendTransactionContent({
                   // (important for paymaster flow)
                   wallet={wallet}
                   ref={sendTxBtnRef}
-                  onClick={() => sendTransaction()}
+                  onClick={() => submitTransaction()}
                   isLoading={
                     sendTransactionMutation.isLoading || operationSetLoading
                   }
                   disabled={
                     sendTransactionMutation.isLoading ||
                     operationSetLoading ||
-                    !!operationSetError
+                    !!operationSetError ||
+                    submitTransactionIsLoading
                   }
                   buttonKind={
                     interpretationHasCriticalWarning ? 'danger' : 'primary'
