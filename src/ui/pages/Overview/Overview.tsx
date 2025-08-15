@@ -71,6 +71,8 @@ import { VStack } from 'src/ui/ui-kit/VStack';
 import { getAddressType } from 'src/shared/wallet/classifiers';
 import { NetworkSelectValue } from 'src/modules/networks/NetworkSelectValue';
 import { useEnableChainAbstraction } from 'src/shared/core/useEnableChainAbstraction';
+import { useGetPortfolioOverview } from '@orb-labs/orby-react';
+import { useIsChainAbstractionEnabled } from 'src/shared/core/useIsChainAbstractionEnabled';
 import { ViewSuspense } from '../../components/ViewSuspense';
 import { WalletAvatar } from '../../components/WalletAvatar';
 import { Feed } from '../Feed';
@@ -351,7 +353,7 @@ function formatPercentChange(value: number, locale: string): PercentChangeInfo {
   };
 }
 
-function OverviewComponent() {
+export function OverviewComponent() {
   useBodyStyle(
     useMemo(() => ({ ['--background' as string]: 'var(--z-index-0)' }), [])
   );
@@ -390,6 +392,24 @@ function OverviewComponent() {
     { enabled: ready, refetchInterval: 40000 }
   );
   const walletPortfolio = data?.data;
+
+  const isChainAbstracted = useIsChainAbstractionEnabled();
+  const { fungibleTokenOverview: unifiedPortfolio } = useGetPortfolioOverview(
+    preferences?.testnetMode?.on,
+    undefined
+  );
+
+  const walletPortfolioInFiat = useMemo(() => {
+    if (isChainAbstracted) {
+      return unifiedPortfolio?.totalValueInFiat?.toExact() ?? 0;
+    } else {
+      return walletPortfolio?.totalValue;
+    }
+  }, [
+    isChainAbstracted,
+    unifiedPortfolio?.totalValueInFiat,
+    walletPortfolio?.totalValue,
+  ]);
 
   const percentageChangeValue = walletPortfolio?.change24h.relative;
   const percentageChange = useMemo(
@@ -605,10 +625,10 @@ function OverviewComponent() {
           ) : null}
           <VStack gap={0}>
             <UIText kind="headline/h1">
-              {walletPortfolio?.totalValue != null ? (
+              {walletPortfolioInFiat != null ? (
                 <NeutralDecimals
                   parts={formatCurrencyToParts(
-                    walletPortfolio.totalValue,
+                    walletPortfolioInFiat,
                     'en',
                     currency
                   )}
