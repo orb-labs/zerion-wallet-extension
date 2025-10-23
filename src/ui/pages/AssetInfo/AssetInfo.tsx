@@ -37,6 +37,7 @@ import type { PopoverToastHandle } from 'src/ui/pages/Settings/PopoverToast';
 import { PopoverToast } from 'src/ui/pages/Settings/PopoverToast';
 import { useGetFungibleTokenBalances } from '@orb-labs/orby-react';
 import type { StandardizedBalance } from '@orb-labs/orby-core';
+import { CurrencyAmount } from '@orb-labs/orby-core';
 import type { WalletAssetDetails } from 'src/modules/zerion-api/requests/wallet-get-asset-details';
 import { findNetworkByChainId } from 'src/modules/networks/networks-fallback';
 import { AssetHistory } from './AssetHistory';
@@ -72,6 +73,8 @@ function convertTokensInfoToWalletAssetDetails(
 
     return {
       chainsDistribution: null,
+      issuersDistribution: null,
+      tokenBalancesOnChainsDistribution: null,
       wallets: [],
       apps: null,
       totalValue,
@@ -113,6 +116,47 @@ function convertTokensInfoToWalletAssetDetails(
       };
     })
     .sort((a, b) => b.percentageAllocation - a.percentageAllocation);
+
+  const sumByIssuer = tokensInfo.tokenBalancesOnChains.reduce(
+    (acc, tokenBalance) => {
+      const currency = tokenBalance.token.currency();
+      let amount = tokenBalance.toRawAmount();
+      const existing = acc.get(currency.symbol);
+      if (existing) {
+        amount += existing.toRawAmount();
+      }
+
+      acc.set(currency.symbol, CurrencyAmount.fromRawAmount(currency, amount));
+
+      return acc;
+    },
+    new Map<string, CurrencyAmount>()
+  );
+
+  enhancedWalletData.issuersDistribution = Array.from(sumByIssuer.entries())
+    .map(([_, amount]) => {
+      return {
+        issuer: amount.currency,
+        value: Number(amount.toExact()) || 0,
+        percentageAllocation:
+          (Number(amount.toExact()) / Number(tokensInfo.total.toExact())) * 100,
+      };
+    })
+    .sort((a, b) => b.percentageAllocation - a.percentageAllocation);
+
+  enhancedWalletData.tokenBalancesOnChainsDistribution =
+    tokensInfo.tokenBalancesOnChains
+      .map((tokenBalance) => {
+        return {
+          tokenBalance: tokenBalance,
+          value: Number(tokenBalance.toExact()) || 0,
+          percentageAllocation:
+            (Number(tokenBalance.toExact()) /
+              Number(tokensInfo.total.toExact())) *
+            100,
+        };
+      })
+      .sort((a, b) => b.percentageAllocation - a.percentageAllocation);
 
   return enhancedWalletData;
 }
@@ -181,6 +225,10 @@ export function AssetInfo() {
   }, [navigationType]);
   useBackgroundKind(whiteBackgroundKind);
 
+  const standardizeChainId = useMemo(() => {
+    return standardizedTokenId ? [standardizedTokenId] : undefined;
+  }, [standardizedTokenId]);
+
   const { fungibleTokenBalances, isLoading: isLoadingFungibleTokenBalances } =
     useGetFungibleTokenBalances(
       false,
@@ -189,7 +237,7 @@ export function AssetInfo() {
       undefined,
       undefined,
       undefined,
-      [standardizedTokenId ?? '']
+      standardizeChainId
     );
 
   const { currency } = useCurrency();
@@ -197,7 +245,7 @@ export function AssetInfo() {
     { currency, fungibleId: asset_code },
     { source: useHttpClientSource() }
   );
-  const assetFullInfo = assetFullInfoData?.data;
+
   const { ready, params } = useAddressParams();
   const { data: portfolioData } = useWalletPortfolio(
     {
@@ -251,6 +299,29 @@ export function AssetInfo() {
     convertedWalletAssetDetails?.chainsDistribution?.at(0)?.chain.id ||
     NetworkId.Zero;
 
+  const assetFullInfo = useMemo(() => {
+    if (!assetFullInfoData?.data) {
+      return undefined;
+    }
+
+    return {
+      ...assetFullInfoData.data,
+      fungible: {
+        ...assetFullInfoData.data.fungible,
+        iconUrl:
+          tokensInfo?.total.currency.logoUrl ??
+          assetFullInfoData.data.fungible.iconUrl,
+        name:
+          tokensInfo?.total.currency.name ??
+          assetFullInfoData.data.fungible.name,
+        symbol:
+          tokensInfo?.total.currency.symbol ??
+          assetFullInfoData.data.fungible.symbol,
+      },
+    };
+  }, [assetFullInfoData, tokensInfo]);
+
+  // Early return check moved after all hooks
   if (
     isLoading ||
     !wallet ||

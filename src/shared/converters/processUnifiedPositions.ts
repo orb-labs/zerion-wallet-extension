@@ -67,6 +67,13 @@ export function processUnifiedPositions({
         standardizedBalance,
         assetImplementationDecimals: assetImplementation?.decimals,
       });
+      position.asset.icon_url =
+        standardizedBalance?.total.currency.logoUrl ?? position.asset.icon_url;
+      position.asset.name =
+        standardizedBalance?.total.currency.name ?? position.asset.name;
+
+      position.asset.symbol =
+        standardizedBalance?.total.currency.symbol ?? position.asset.symbol;
 
       position.value = standardizedBalance?.totalValueInFiat?.toExact() || null;
       position.asset.implementations =

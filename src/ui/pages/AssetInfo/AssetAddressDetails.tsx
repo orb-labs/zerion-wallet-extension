@@ -36,6 +36,7 @@ import { CenteredDialog } from 'src/ui/ui-kit/ModalDialogs/CenteredDialog';
 import type { AssetAddressPnl } from 'src/modules/zerion-api/requests/asset-get-fungible-pnl';
 import { formatPriceValue } from 'src/shared/units/formatPriceValue';
 import type { ResponseBody } from 'src/modules/zerion-api/requests/ResponseBody';
+import { findNetworkByChainId } from 'src/modules/networks/networks-fallback';
 import { getColor, getSign } from './helpers';
 import { AssetHeader } from './AssetHeader';
 
@@ -256,13 +257,13 @@ function AssetStats({
   );
 }
 
-function AssetNetworkDistribution({
+function AssetDistribution({
   walletAssetDetails,
 }: {
   walletAssetDetails: WalletAssetDetails;
 }) {
   const { currency } = useCurrency();
-  const [showNetworkDistribution, setShowNetworkDistribution] = useState(false);
+  const [showDistribution, setShowDistribution] = useState(false);
 
   return (
     <VStack gap={0}>
@@ -285,7 +286,7 @@ function AssetNetworkDistribution({
         />
         <UnstyledButton
           style={{ position: 'relative', width: '100%' }}
-          onClick={() => setShowNetworkDistribution((prev) => !prev)}
+          onClick={() => setShowDistribution((prev) => !prev)}
         >
           <HStack
             gap={12}
@@ -295,7 +296,9 @@ function AssetNetworkDistribution({
           >
             <HStack gap={8} alignItems="center">
               <ChainsIcon style={{ width: 24, height: 24 }} />
-              <UIText kind="body/accent">Network Distribution</UIText>
+              <UIText kind="body/accent">
+                {showDistribution ? 'Hide Details' : 'View Details'}
+              </UIText>
             </HStack>
             <ArrowDownIcon
               style={{
@@ -303,9 +306,7 @@ function AssetNetworkDistribution({
                 height: 24,
                 transformOrigin: 'center',
                 transitionDuration: '0.2s',
-                transform: showNetworkDistribution
-                  ? 'rotate(0deg)'
-                  : 'rotate(90deg)',
+                transform: showDistribution ? 'rotate(0deg)' : 'rotate(90deg)',
               }}
             />
           </HStack>
@@ -315,44 +316,274 @@ function AssetNetworkDistribution({
       <div
         style={{
           overflow: 'hidden',
-          maxHeight: showNetworkDistribution
-            ? (walletAssetDetails.chainsDistribution?.length || 0) * 40
+          maxHeight: showDistribution
+            ? (walletAssetDetails.issuersDistribution?.length || 0) * 60 +
+              (walletAssetDetails.tokenBalancesOnChainsDistribution?.length ||
+                0) *
+                60 +
+              120
             : 0,
           transition: 'max-height 0.3s ease-in-out',
         }}
       >
         <VStack gap={16} style={{ paddingTop: 16 }}>
-          {walletAssetDetails.chainsDistribution?.map(
-            ({ chain, percentageAllocation, value }) => (
-              <HStack
-                key={chain.id}
-                gap={12}
-                justifyContent="space-between"
-                alignItems="center"
+          {/* Issuer Distribution Section */}
+          <VStack gap={8}>
+            {/* Table Headers */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr auto auto',
+                gap: 16,
+                padding: '0 16px',
+                marginBottom: 8,
+              }}
+            >
+              <UIText kind="small/accent" color="var(--neutral-500)">
+                Issuer
+              </UIText>
+              <UIText
+                kind="small/accent"
+                color="var(--neutral-500)"
+                style={{ textAlign: 'right' }}
               >
-                <HStack gap={8} alignItems="center">
-                  <img
-                    src={chain.iconUrl}
-                    alt={chain.name}
-                    width={16}
-                    height={16}
-                  />
-                  <HStack gap={4} alignItems="center">
-                    <UIText kind="body/regular">{chain.name}</UIText>
-                    <UIText kind="caption/regular" color="var(--neutral-500)">
-                      {`${middot} ${formatPercent(
-                        percentageAllocation,
-                        'en'
-                      )}%`}
+                Balance
+              </UIText>
+              <UIText
+                kind="small/accent"
+                color="var(--neutral-500)"
+                style={{ textAlign: 'right' }}
+              >
+                % of Total
+              </UIText>
+            </div>
+
+            {/* Issuer Table Rows */}
+            {walletAssetDetails.issuersDistribution?.map(
+              ({ issuer, percentageAllocation, value }) => (
+                <div
+                  key={issuer.symbol}
+                  style={{
+                    backgroundColor: 'var(--neutral-100)',
+                    borderRadius: 12,
+                    padding: '12px 16px',
+                    display: 'grid',
+                    gridTemplateColumns: '1fr auto auto',
+                    gap: 16,
+                    alignItems: 'center',
+                  }}
+                >
+                  {/* Issuer Column */}
+                  <HStack gap={8} alignItems="center" style={{ minWidth: 0 }}>
+                    <img
+                      src={issuer.logoUrl}
+                      alt={issuer.name}
+                      width={16}
+                      height={16}
+                      style={{ borderRadius: '50%', flexShrink: 0 }}
+                    />
+                    <UIText
+                      kind="body/regular"
+                      style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        minWidth: 0,
+                      }}
+                    >
+                      {issuer.name}
                     </UIText>
                   </HStack>
-                </HStack>
-                <UIText kind="body/accent">
-                  {formatCurrencyValue(value, 'en', currency)}
-                </UIText>
-              </HStack>
-            )
-          )}
+
+                  {/* Balance Column */}
+                  <UIText
+                    kind="body/accent"
+                    style={{
+                      textAlign: 'right',
+                      minWidth: '80px',
+                    }}
+                  >
+                    {formatCurrencyValue(value, 'en', currency)}
+                  </UIText>
+
+                  {/* Percentage Column */}
+                  <UIText
+                    kind="body/accent"
+                    style={{
+                      textAlign: 'right',
+                      color: 'var(--primary-500)',
+                      minWidth: '60px',
+                    }}
+                  >
+                    {formatPercent(percentageAllocation, 'en')}%
+                  </UIText>
+                </div>
+              )
+            )}
+          </VStack>
+
+          {/* Network Distribution Section */}
+          <VStack gap={8}>
+            {/* Table Headers */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr auto auto',
+                gap: 16,
+                padding: '0 16px',
+                marginBottom: 8,
+              }}
+            >
+              <UIText kind="small/accent" color="var(--neutral-500)">
+                Asset & Network
+              </UIText>
+              <UIText
+                kind="small/accent"
+                color="var(--neutral-500)"
+                style={{ textAlign: 'right' }}
+              >
+                Balance
+              </UIText>
+              <UIText
+                kind="small/accent"
+                color="var(--neutral-500)"
+                style={{ textAlign: 'right' }}
+              >
+                % of Total
+              </UIText>
+            </div>
+
+            {/* Network Table Rows */}
+            {walletAssetDetails.tokenBalancesOnChainsDistribution?.map(
+              ({ tokenBalance, percentageAllocation, value }) => {
+                const networkConfig = findNetworkByChainId(
+                  tokenBalance.token.chainId.toString()
+                );
+
+                return (
+                  <div
+                    key={
+                      tokenBalance.token.chainId.toString() +
+                      tokenBalance.token.address
+                    }
+                    style={{
+                      backgroundColor: 'var(--neutral-100)',
+                      borderRadius: 12,
+                      padding: '12px 16px',
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto auto',
+                      gap: 16,
+                      alignItems: 'center',
+                    }}
+                  >
+                    {/* Asset & Network Column */}
+                    <HStack gap={8} alignItems="center" style={{ minWidth: 0 }}>
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <img
+                          src={tokenBalance.token.currency().logoUrl}
+                          alt={tokenBalance.token.currency().name}
+                          width={16}
+                          height={16}
+                          style={{ borderRadius: '50%', flexShrink: 0 }}
+                        />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: -2,
+                            right: -2,
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            backgroundColor: 'var(--primary-500)',
+                            border: '2px solid var(--white)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 1,
+                          }}
+                        >
+                          {networkConfig?.icon_url ? (
+                            <img
+                              src={networkConfig.icon_url}
+                              alt={
+                                networkConfig.name ||
+                                `Chain ${tokenBalance.token.chainId}`
+                              }
+                              width={8}
+                              height={8}
+                              style={{ borderRadius: '50%' }}
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: '50%',
+                                backgroundColor: 'var(--white)',
+                                fontSize: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'var(--primary-500)',
+                                fontWeight: 'bold',
+                              }}
+                            >
+                              {tokenBalance.token.chainId.toString().slice(-1)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <UIText
+                        kind="body/regular"
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          minWidth: 0,
+                          maxWidth: '120px',
+                        }}
+                      >
+                        {tokenBalance.token.currency().name}
+                      </UIText>
+                      <UIText
+                        kind="caption/regular"
+                        color="var(--neutral-500)"
+                        style={{ flexShrink: 0 }}
+                      >
+                        {middot}
+                      </UIText>
+                    </HStack>
+
+                    {/* Balance Column */}
+                    <UIText
+                      kind="body/accent"
+                      style={{
+                        textAlign: 'right',
+                        minWidth: '80px',
+                      }}
+                    >
+                      {formatCurrencyValue(value, 'en', currency)}
+                    </UIText>
+
+                    {/* Percentage Column */}
+                    <UIText
+                      kind="body/accent"
+                      style={{
+                        textAlign: 'right',
+                        color: 'var(--primary-500)',
+                        minWidth: '60px',
+                      }}
+                    >
+                      {formatPercent(percentageAllocation, 'en')}%
+                    </UIText>
+                  </div>
+                );
+              }
+            )}
+          </VStack>
         </VStack>
       </div>
     </VStack>
@@ -500,7 +731,7 @@ function AssetImplementationsDialogContent({
           assetAddressPnlQuery={assetAddressPnlQuery}
         />
         <Line />
-        <AssetNetworkDistribution walletAssetDetails={walletAssetDetails} />
+        <AssetDistribution walletAssetDetails={walletAssetDetails} />
         <Line />
         <AssetAppDistribution
           assetFullInfo={assetFullInfo}
