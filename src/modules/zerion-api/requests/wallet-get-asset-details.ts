@@ -1,3 +1,4 @@
+import type { Currency, FungibleTokenAmount } from '@orb-labs/orby-core';
 import type { ClientOptions } from '../shared';
 import { CLIENT_DEFAULTS, ZerionHttpClient } from '../shared';
 import type { ZerionApiContext } from '../zerion-api-bare';
@@ -20,6 +21,16 @@ interface NetworkShortInfo {
 export interface WalletAssetDetails {
   chainsDistribution: Array<{
     chain: NetworkShortInfo;
+    value: number;
+    percentageAllocation: number;
+  }> | null;
+  tokenBalancesOnChainsDistribution: Array<{
+    tokenBalance: FungibleTokenAmount;
+    value: number;
+    percentageAllocation: number;
+  }> | null;
+  issuersDistribution: Array<{
+    issuer: Currency;
     value: number;
     percentageAllocation: number;
   }> | null;
